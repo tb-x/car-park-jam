@@ -1,0 +1,1875 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Car Park Jam</title>
+<meta name="theme-color" content="#2f6fde">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Car Park">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap">
+<style>
+  /* Layout: the 3D car park fills the screen; the level badge sits top-centre between the home and sound buttons, and the title and win cards float over the middle. */
+  :root{
+    --ink:#23324a; --cream:#fff8e7; --blue:#2f6fde; --blue-d:#1f4fa8; --green:#3fb950; --green-d:#2a7d38; --yellow:#ffd23f; --red:#e5484d;
+    --title:'Luckiest Guy','Arial Rounded MT Bold','Trebuchet MS',system-ui,sans-serif;
+    --read:Verdana,Tahoma,sans-serif;
+    color-scheme: light;
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  html,body{height:100%;margin:0;overflow:hidden;background:#8fd16a;color:var(--ink);font-family:var(--read);
+    touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;
+    -webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  button{font:inherit;color:inherit;border:0;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+
+  #stage{position:fixed;inset:0;overflow:hidden;background:#8fd16a}
+  #c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+
+  /* ---------- badge: level number and the cars still in the car park ---------- */
+  #badge{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:5;
+    display:flex;align-items:center;gap:12px;padding:4px 14px 4px 6px;border-radius:24px;background:rgba(255,255,255,.88);
+    box-shadow:0 3px 0 rgba(0,0,0,.15);pointer-events:none;white-space:nowrap;font-weight:bold;font-size:20px}
+  #badge span{display:flex;align-items:center;gap:5px}
+  #badge svg{width:32px;height:32px;display:block}
+  #left.pop{animation:pop .35s}
+  @keyframes pop{40%{transform:scale(1.35)}}
+
+  #mute{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));z-index:50;
+    width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.88);font-size:22px;line-height:44px;padding:0;box-shadow:0 3px 0 rgba(0,0,0,.15)}
+
+  /* ---------- home: back to the list of all games ---------- */
+  #home{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));z-index:50;
+    width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:#23324a;background:rgba(255,255,255,.88);
+    box-shadow:0 3px 0 rgba(0,0,0,.18);touch-action:manipulation;-webkit-tap-highlight-color:transparent;text-decoration:none}
+  #home svg{width:24px;height:24px}
+  #home:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.18)}
+
+  /* ---------- hint hand and the cross "beep!" bubbles, placed over the 3D cars ---------- */
+  #hand{position:absolute;left:0;top:0;width:58px;height:58px;z-index:4;pointer-events:none;opacity:0;transition:opacity .3s;
+    filter:drop-shadow(0 3px 2px rgba(0,0,0,.3))}
+  #hand.on{opacity:1}
+  #hand svg{width:100%;height:100%;animation:tap 1s ease-in-out infinite}
+  @keyframes tap{0%,100%{transform:translate(0,0)}45%{transform:translate(0,10px) scale(.92)}}
+  .bubble{position:absolute;left:0;top:0;z-index:4;pointer-events:none;font-size:30px;line-height:1;
+    padding:4px 7px 6px;border-radius:16px;background:#fff;box-shadow:0 3px 0 rgba(0,0,0,.18);transform:translate(-50%,-100%);
+    animation:bub .9s ease-out forwards}
+  .bubble::after{content:'';position:absolute;left:50%;bottom:-7px;margin-left:-7px;border:7px solid transparent;border-bottom:0;border-top-color:#fff}
+  @keyframes bub{0%{opacity:0;scale:.3}15%{opacity:1;scale:1.15}25%{scale:1}80%{opacity:1}100%{opacity:0;scale:1}}
+
+  /* ---------- cards: title and level done ---------- */
+  .veil{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:20px;background:rgba(20,40,70,.25)}
+  .card{display:flex;flex-direction:column;align-items:center;gap:14px;padding:22px 28px 24px;border-radius:30px;background:var(--cream);
+    box-shadow:0 8px 0 rgba(0,0,0,.18);text-align:center;max-width:min(420px, 92vw);animation:rise .45s cubic-bezier(.3,1.5,.6,1)}
+  @keyframes rise{from{transform:translateY(40px) scale(.8);opacity:0}}
+  .card h1{margin:0;font-family:var(--title);font-weight:normal;font-size:clamp(38px, 10vmin, 58px);line-height:1;color:var(--blue);
+    letter-spacing:1px;text-shadow:0 3px 0 #fff, 0 5px 0 rgba(0,0,0,.12)}
+  .card .lvl{display:flex;align-items:center;gap:8px;font-weight:bold;font-size:22px}
+  .card .lvl svg{width:36px;height:36px}
+  .big{width:clamp(84px, 22vmin, 112px);height:clamp(84px, 22vmin, 112px);border-radius:50%;background:var(--green);color:#fff;
+    display:grid;place-items:center;box-shadow:0 6px 0 var(--green-d);padding:0}
+  .big svg{width:52%;height:52%;margin-left:8%}
+  .big:active{transform:translateY(4px);box-shadow:0 2px 0 var(--green-d)}
+  #again{position:absolute;right:12px;bottom:10px;width:38px;height:38px;border-radius:50%;background:rgba(0,0,0,.06);font-size:18px;padding:0;color:#556}
+  #title .card{position:relative}
+  .cheer{font-size:clamp(50px, 14vmin, 72px);line-height:1}
+  .cheer i{display:inline-block;font-style:normal;animation:hop .6s ease-in-out infinite alternate}
+  .cheer i:nth-child(2){animation-delay:.15s}
+  .cheer i:nth-child(3){animation-delay:.3s}
+  @keyframes hop{to{transform:translateY(-10px)}}
+
+  .confetti{position:fixed;top:-20px;width:10px;height:16px;z-index:19;pointer-events:none;border-radius:2px;animation:fall linear forwards}
+  @keyframes fall{to{transform:translateY(110vh) rotate(720deg)}}
+
+  @media (prefers-reduced-motion: reduce){ .card,.cheer i,#hand svg{animation:none} }
+</style>
+</head>
+<body>
+<a id="home" href="../index.html" aria-label="All games" title="All games"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 9.8V20h12V9.8" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/><path d="M10 20v-5.5h4V20" fill="currentColor"/></svg></a>
+<button id="mute" aria-label="Sound on or off">🔈</button>
+<div id="stage">
+  <canvas id="c"></canvas>
+  <div id="badge" aria-hidden="true">
+    <span><svg viewBox="0 0 32 32"><rect x="2" y="2" width="28" height="28" rx="6" fill="#2f6fde" stroke="#fff" stroke-width="2"/><path d="M11 25V8h6.5a5 5 0 0 1 0 10H11" fill="none" stroke="#fff" stroke-width="3.6" stroke-linejoin="round"/></svg><b id="lvl"></b></span>
+    <span id="left"><svg viewBox="0 0 32 32"><path d="M4 21v-4.5l3.5-6.5h14l5 6.5h1.5v4.5z" fill="#e5484d" stroke="#23324a" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.5 12h5v4.5H7.3zM17 12h4l3.4 4.5H17z" fill="#bfe6ff"/><circle cx="10" cy="22" r="3.2" fill="#2b2b33"/><circle cx="23" cy="22" r="3.2" fill="#2b2b33"/></svg><b id="count"></b></span>
+  </div>
+  <div id="hand"><svg viewBox="0 0 64 64"><path d="M25 7a5 5 0 0 1 10 0v21l3-.6a5 5 0 0 1 5.6 3.2l.4.9a5 5 0 0 1 6.6 3.4l.3.9a5 5 0 0 1 6.1 4.9V48c0 8.8-7.2 14-16 14h-5c-6.2 0-10.6-2.8-14-8L11 43.5a5 5 0 0 1 7.6-6.4L25 43z" fill="#fff" stroke="#23324a" stroke-width="3" stroke-linejoin="round"/></svg></div>
+</div>
+
+<div id="title" class="veil">
+  <div class="card">
+    <h1>Car Park<br>Jam</h1>
+    <div class="lvl"><svg viewBox="0 0 32 32"><rect x="2" y="2" width="28" height="28" rx="6" fill="#2f6fde" stroke="#fff" stroke-width="2"/><path d="M11 25V8h6.5a5 5 0 0 1 0 10H11" fill="none" stroke="#fff" stroke-width="3.6" stroke-linejoin="round"/></svg><span id="tlvl"></span></div>
+    <button id="play" class="big" aria-label="Play"><svg viewBox="0 0 24 24"><path d="M6 3.5v17l14-8.5z" fill="currentColor"/></svg></button>
+    <button id="again" aria-label="Start again from level 1" title="Start again from level 1" hidden>↺</button>
+  </div>
+</div>
+
+<div id="done" class="veil" hidden>
+  <div class="card">
+    <div class="cheer" aria-hidden="true"><i>🚗</i><i>🚌</i><i>🚕</i></div>
+    <div class="lvl"><svg viewBox="0 0 32 32"><rect x="2" y="2" width="28" height="28" rx="6" fill="#2f6fde" stroke="#fff" stroke-width="2"/><path d="M11 25V8h6.5a5 5 0 0 1 0 10H11" fill="none" stroke="#fff" stroke-width="3.6" stroke-linejoin="round"/></svg><span id="dlvl"></span> <span aria-hidden="true">✅</span></div>
+    <button id="next" class="big" aria-label="Next car park"><svg viewBox="0 0 24 24"><path d="M6 3.5v17l14-8.5z" fill="currentColor"/></svg></button>
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+
+/* ======== tuning knobs ======== */
+const DRIVE_SPEED = 5;      // top speed in the car park, squares per second
+const ROAD_SPEED = 7;       // top speed on the road round the car park
+const ACCEL = 9;            // how fast cars pick up speed
+const BRAKE = 30;           // how hard they stop for a car in front
+const BUMP_SPEED = 4.5;     // how fast a blocked car rolls up to whatever is in its way
+const HINT_DELAY = 9;       // seconds without a car leaving before a hand shows one that can go
+const FIRST_HINT = 1.2;     // the same on level 1, where the hand teaches the tap
+const PIVOT_RATE = 6;       // how fast a car turns on the spot when it pulls out onto the road (radians a second)
+const STUCK_POOF = 6;       // a last resort: when no car at all has moved for this long, the one waiting longest vanishes in a puff
+const POP_DOWN = 4;         // pop-up bollards: seconds down (cars can pass),
+const POP_WARN = 1;         // seconds blinking before they rise,
+const POP_UP = 3;           // and seconds up (in the way)
+const DUCK_EVERY = [14, 24];   // seconds between duck families crossing the exit road (shortest, longest)
+const DUCK_SPEED = 0.9;     // how fast the ducks waddle, squares per second
+const ASSET_V = 1;          // bump after replacing any file in assets/, so phones don't keep the old one
+const CLIP_VOL = 0.9;       // sound effects and the voice
+const MUSIC_VOL = 0.22;     // background music (it dips while the voice speaks)
+const HELP_TIMES = 2;       // how many times each helper line is said, ever (they're remembered on the device)
+// each clip's loudness, evened out from measuring them: frequent sounds (bollards, the barrier, stars) kept low
+const CLIP_TRIM = { 'sfx-start': 1.1, 'sfx-start-big': 0.8, 'sfx-honk': 1, 'sfx-horn-big': 0.7, 'sfx-bump': 1.2, 'sfx-bollard': 0.45,
+  'sfx-clang': 1.1, 'sfx-gate': 0.5, 'sfx-siren-police': 0.5, 'sfx-siren-fire': 0.5, 'sfx-siren-ambulance': 0.35, 'sfx-jingle': 0.6,
+  'sfx-yawn': 0.9, 'sfx-quack': 0.75, 'sfx-peep': 0.7, 'sfx-sparkle': 0.55, 'sfx-fanfare': 0.9 };
+const MUSIC_XFADE = 2;      // seconds of each music track's end blended into its start, so it loops without a seam
+// Each car park: w×h squares, cars, the share of long ones (buses, fire engines, lorries, mixers), obstacles (cones,
+// trees, bollards), the share of edges with a hedge (no way out there), and depth: how many rounds it should take if
+// every car that can go leaves at once. Then the extras: sleepy cars (tap once to wake them), pop-up bollards that
+// rise and sink, and ducks that cross the exit road. Level 1 is drawn by hand. After the list, levels repeat the last
+// ones with new layouts.
+const LEVELS = [
+  null,
+  { w: 3, h: 4, cars: 4, depth: 2 },
+  { w: 4, h: 4, cars: 5, depth: 2, ducks: true },
+  { w: 4, h: 5, cars: 7, depth: 3, sleepy: 1 },
+  { w: 4, h: 5, cars: 6, long: 0.35, depth: 3, sleepy: 1, ducks: true },
+  { w: 5, h: 5, cars: 8, long: 0.2, depth: 3 },
+  { w: 5, h: 6, cars: 9, obst: 2, depth: 3, sleepy: 1 },
+  { w: 5, h: 6, cars: 11, long: 0.2, obst: 2, depth: 4, ducks: true },
+  { w: 5, h: 6, cars: 10, fence: 0.3, depth: 4, pops: 1 },
+  { w: 5, h: 7, cars: 13, long: 0.2, depth: 4, sleepy: 2, ducks: true },
+  { w: 6, h: 7, cars: 15, long: 0.2, obst: 2, depth: 4, pops: 2 },
+  { w: 6, h: 7, cars: 15, long: 0.25, fence: 0.3, depth: 5, sleepy: 2, ducks: true },
+  { w: 6, h: 8, cars: 17, long: 0.25, obst: 3, fence: 0.25, depth: 5, pops: 2 },
+  { w: 7, h: 8, cars: 20, long: 0.25, obst: 3, fence: 0.25, depth: 5, sleepy: 2, ducks: true },
+  { w: 7, h: 9, cars: 22, long: 0.3, obst: 4, fence: 0.3, depth: 6, pops: 3, sleepy: 2, ducks: true },
+];
+const REPEAT_FROM = 10;     // past the list, levels pick from LEVELS[REPEAT_FROM..]
+const COLORS = ['#e5484d', '#2f6fde', '#3fb950', '#ff8a1f', '#8b5cf6', '#ff6fa8', '#14b8a6', '#ffd23f', '#6fc3ff'];
+// The look of each car park: sky, light and plants. Car parks 1-2 are sunny, then the themes take turns.
+const THEMES = {
+  day: { sky: '#8fcbff', horizon: '#e4f4ff', fog: '#cfe8f7', grass: ['#79c257', '#8fd067', '#6bb54c'], hemi: ['#ffffff', '#7c8f5c', 0.4],
+    sun: ['#fff1d8', 2.8], sunDir: [-0.5, 1, -0.35], exposure: 0.8, leaves: ['#3f9c45', '#52b04c', '#2f8a3c'], flowers: true },
+  evening: { sky: '#f59a62', horizon: '#ffd9a3', fog: '#f0c49a', grass: ['#86b552', '#98c35e', '#77a748'], hemi: ['#ffd8b5', '#5b4d6b', 0.55],
+    sun: ['#ffb066', 3.0], sunDir: [-1, 0.75, -0.25], exposure: 0.9, leaves: ['#4b8d3a', '#62a03e', '#3d7a34'], flowers: true, lamps: 0.7 },
+  autumn: { sky: '#a7cbe8', horizon: '#eef1e4', fog: '#e2dccb', grass: ['#9db35a', '#adbf63', '#8ea64f'], hemi: ['#fff5e6', '#7a6a4a', 0.4],
+    sun: ['#ffe2b8', 2.7], sunDir: [-0.4, 1, -0.5], exposure: 0.8, leaves: ['#ea8a2b', '#d9542b', '#f2c03a', '#c4662a'], fallen: true, fall: 'leaves' },
+  snow: { sky: '#bcd6ea', horizon: '#eef4f9', fog: '#e3edf5', grass: ['#f3f7fb', '#ffffff', '#e4ecf3'], hemi: ['#ffffff', '#b9c6d3', 0.45],
+    sun: ['#fff8f0', 2.3], sunDir: [-0.5, 1, -0.2], exposure: 0.75, leaves: ['#2f7a4a', '#3b8a52', '#2a6a42'], snow: true, fall: 'snow' },
+  night: { sky: '#1a2848', horizon: '#33507c', fog: '#1f3254', grass: ['#5f9a49', '#6aa653', '#558f42'], hemi: ['#a9c0ff', '#24322a', 0.85],
+    sun: ['#c4d4ff', 1.6], sunDir: [0.45, 1, -0.5], exposure: 1.1, leaves: ['#3f8f45', '#4b9c4c', '#357d3c'], lamps: 1, night: true },
+};
+const THEME_ORDER = ['day', 'evening', 'autumn', 'snow', 'night'];
+const themeFor = (n) => THEMES[params.get('theme')] || THEMES[n <= 2 ? 'day' : THEME_ORDER[(n - 3) % THEME_ORDER.length]];
+
+/* ======== little helpers ======== */
+const $ = (s) => document.querySelector(s);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('carpark.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('carpark.' + k, JSON.stringify(v)); } catch {} },
+};
+const params = new URLSearchParams(location.search);
+const FORCE_MUTE = params.has('mute') || params.has('tbxtest');   // test runs stay silent
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const ease = (t) => t * t * (3 - 2 * t);
+const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+function rngFrom(seed) {
+  let a = seed >>> 0;
+  return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+/* ======== sound: recorded clips, each with a synthesized stand-in ======== */
+// The clips in assets/ (ElevenLabs, see the README) load while the title shows and decode on the first tap. Every
+// sound falls back to a synthesized version when its clip can't load (from disk, say), and the voice to the device's
+// own voice.
+const CLIPS = ['sfx-start', 'sfx-start-big', 'sfx-honk', 'sfx-horn-big', 'sfx-bump', 'sfx-bollard', 'sfx-clang', 'sfx-gate',
+  'sfx-siren-police', 'sfx-siren-fire', 'sfx-siren-ambulance', 'sfx-jingle', 'sfx-yawn', 'sfx-quack', 'sfx-peep', 'sfx-sparkle',
+  'sfx-fanfare', 'say-out-1', 'say-out-2', 'say-out-3', 'say-tap', 'say-sleepy', 'say-bollard', 'say-ducks', 'music-day', 'music-night'];
+const SAID = { 'say-out-1': 'All the cars are out!', 'say-out-2': 'Hooray! Everyone is out!', 'say-out-3': 'Great job! The car park is empty!',
+  'say-tap': 'Tap a car that can drive out!', 'say-sleepy': "Shh, it's asleep. Tap to wake it up!",
+  'say-bollard': 'Wait for the bollard to go down!', 'say-ducks': 'Wait for the ducks!' };
+const sfx = (() => {
+  let ac = null, out = null, musicBus = null, noise = null, muted = FORCE_MUTE || store.get('muted', false), track = null, wantMusic = null, voiceUntil = 0;
+  const raw = {}, clips = {};
+  for (const n of CLIPS) raw[n] = fetch(`assets/${n}.mp3?v=${ASSET_V}`).then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null);
+  function init() {
+    if (ac) { if (ac.state !== 'running') ac.resume().catch(() => {}); return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    ac = new AC(); out = ac.createGain(); out.gain.value = muted ? 0 : 0.8; out.connect(ac.destination);
+    musicBus = ac.createGain(); musicBus.gain.value = 1; musicBus.connect(out);
+    noise = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    for (const n of CLIPS) raw[n].then((b) => b && new Promise((res, rej) => ac.decodeAudioData(b, res, rej)))
+      .then((buf) => { if (!buf) return; clips[n] = n.startsWith('music') ? loopable(buf) : buf; if (wantMusic === n) music(n); }).catch(() => {});
+  }
+  const ok = () => ac && ac.state === 'running';   // muted sounds still play, into a silent output
+  // the end of a music track blended into its start, so it loops without a seam
+  function loopable(buf) {
+    const X = Math.floor(MUSIC_XFADE * buf.sampleRate), L = buf.length - X;
+    const b = ac.createBuffer(buf.numberOfChannels, L, buf.sampleRate);
+    for (let c = 0; c < buf.numberOfChannels; c++) {
+      const d = buf.getChannelData(c), o = b.getChannelData(c);
+      o.set(d.subarray(0, L));
+      for (let i = 0; i < X; i++) { const u = i / X; o[i] = d[i] * Math.sin(u * Math.PI / 2) + d[L + i] * Math.cos(u * Math.PI / 2); }
+    }
+    return b;
+  }
+  // plays a loaded clip; false if it isn't loaded, so the caller can synthesize instead
+  function clip(name, at = 0) {
+    const buf = clips[name]; if (!ok() || !buf) return false;
+    const s = ac.createBufferSource(), g = ac.createGain(); s.buffer = buf;
+    g.gain.value = CLIP_VOL * (CLIP_TRIM[name] ?? 1); s.connect(g).connect(out); s.start(ac.currentTime + at);
+    return buf.duration;
+  }
+  // one looping track at a time, crossfading when it changes
+  function music(name) {
+    wantMusic = name;
+    if (!ac) return;
+    const t = ac.currentTime;
+    if (track && track.name === name) return;
+    if (track) { const old = track; old.g.gain.setTargetAtTime(0.0001, t, 0.4); setTimeout(() => { try { old.s.stop(); } catch {} }, 2500); track = null; }
+    const buf = name && clips[name]; if (!buf) return;
+    const s = ac.createBufferSource(), g = ac.createGain(); s.buffer = buf; s.loop = true;
+    g.gain.setValueAtTime(0.0001, t); g.gain.setTargetAtTime(MUSIC_VOL, t, 0.6);
+    s.connect(g).connect(musicBus); s.start(); track = { name, s, g };
+  }
+  function tone(type, f0, f1, at, dur, vol, cut) {
+    const t = ac.currentTime + at, o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.015); g.gain.setValueAtTime(vol, t + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    let node = o.connect(g);
+    if (cut) { const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = cut; g.connect(f); node = f; }
+    node.connect(out); o.start(t); o.stop(t + dur + 0.05);
+  }
+  function hiss(at, dur, vol, cut) {
+    const t = ac.currentTime + at, s = ac.createBufferSource(), g = ac.createGain(), f = ac.createBiquadFilter();
+    s.buffer = noise; f.type = 'lowpass'; f.frequency.value = cut;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f).connect(g).connect(out); s.start(t); s.stop(t + dur + 0.05);
+  }
+  return {
+    init, music,
+    get muted() { return muted; },
+    toggle() { muted = !muted; if (!FORCE_MUTE) store.set('muted', muted); if (out) out.gain.value = muted ? 0 : 0.8; if (muted) try { speechSynthesis.cancel(); } catch {} return muted; },
+    tap() { if (ok()) tone('sine', 660, 760, 0, 0.06, 0.06); },
+    vroom(big) {
+      if (!ok() || clip(big ? 'sfx-start-big' : 'sfx-start')) return;
+      tone('sawtooth', big ? 42 : 60, big ? 95 : 140, 0, 0.7, 0.16, 520);
+      tone('sawtooth', big ? 44 : 63, big ? 100 : 150, 0.02, 0.65, 0.1, 420);
+    },
+    honk(big, twice) {
+      if (!ok() || clip(big ? 'sfx-horn-big' : 'sfx-honk')) return;
+      const f = big ? [196, 247] : [392, 494];
+      for (let i = 0; i < (twice ? 2 : 1); i++) for (const n of f) tone('square', n, n * 0.98, i * 0.3, 0.24, 0.07, 1800);
+    },
+    beep() { if (ok()) tone('sine', 1050, 1050, 0, 0.11, 0.07); },
+    thud() { if (!ok() || clip('sfx-bump')) return; tone('sine', 150, 45, 0, 0.2, 0.3); hiss(0, 0.09, 0.2, 500); },
+    boing() { if (ok()) { tone('triangle', 240, 520, 0, 0.12, 0.12); tone('triangle', 520, 300, 0.12, 0.2, 0.1); } },
+    clang() { if (!ok() || clip('sfx-clang')) return; tone('square', 880, 840, 0, 0.18, 0.05, 2600); tone('sine', 1320, 1250, 0, 0.35, 0.06); },
+    clunk() { if (!ok() || clip('sfx-bollard')) return; tone('sine', 220, 120, 0, 0.12, 0.12); hiss(0, 0.06, 0.08, 900); },
+    pop() { if (ok()) tone('sine', 620, 980, 0, 0.09, 0.09); },
+    sparkle() { if (!ok() || clip('sfx-sparkle')) return; [1568, 2093, 2637].forEach((n, i) => tone('triangle', n, n, i * 0.06, 0.16, 0.04)); },
+    gate() { if (!ok() || clip('sfx-gate')) return; tone('triangle', 1318, 1318, 0, 0.18, 0.08); tone('triangle', 1760, 1760, 0.09, 0.25, 0.07); },
+    siren(kind) {
+      if (!ok() || clip('sfx-siren-' + kind)) return;
+      const [a, b] = kind === 'ambulance' ? [960, 760] : [860, 620];
+      for (let i = 0; i < 4; i++) tone('triangle', i % 2 ? b : a, i % 2 ? b : a, i * 0.34, 0.32, 0.05);
+    },
+    jingle() { if (!ok() || clip('sfx-jingle')) return; [784, 880, 988, 784, 988, 1175, 988].forEach((n, i) => tone('triangle', n, n, i * 0.15, 0.14, 0.06)); },
+    yawn() { if (!ok() || clip('sfx-yawn')) return; tone('sine', 520, 260, 0, 0.55, 0.08); tone('sine', 780, 390, 0, 0.55, 0.03); },
+    quack() {
+      if (!ok()) return;
+      if (clip('sfx-quack')) { clip('sfx-peep', 0.5); return; }
+      for (let i = 0; i < 2; i++) { tone('sawtooth', 560, 380, i * 0.16, 0.12, 0.06, 1500); tone('square', 280, 200, i * 0.16, 0.12, 0.03, 900); }
+    },
+    fanfare() {
+      if (!ok() || clip('sfx-fanfare')) return;
+      [523, 659, 784, 1047].forEach((n, i) => tone('triangle', n, n, i * 0.13, 0.22, 0.12));
+      for (const n of [523, 659, 784, 1047]) tone('triangle', n, n, 0.58, 0.7, 0.07);
+    },
+    // a spoken line (one of SAID's keys); the music dips under it
+    say(key) {
+      if (!ok()) return;
+      const d = clip(key);
+      if (d) {
+        const t = ac.currentTime; voiceUntil = t + d;
+        musicBus.gain.cancelScheduledValues(t); musicBus.gain.setTargetAtTime(0.45, t, 0.1); musicBus.gain.setTargetAtTime(1, t + d, 0.4);
+        return;
+      }
+      if (muted || !('speechSynthesis' in window)) return;
+      try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(SAID[key]); u.lang = 'en-GB'; u.rate = 0.95; u.pitch = 1.15; speechSynthesis.speak(u); } catch {}
+    },
+    get speaking() { return ac && ac.currentTime < voiceUntil; },
+    get loaded() { return Object.keys(clips); }, get running() { return ok(); }, get playingMusic() { return track && track.name; },
+  };
+})();
+// the helper lines are said the first HELP_TIMES times they're needed, ever, then the child knows
+function help(key) {
+  const heard = store.get('heard', {});
+  if ((heard[key] || 0) >= HELP_TIMES || sfx.speaking) return;
+  heard[key] = (heard[key] || 0) + 1; store.set('heard', heard);
+  sfx.say(key);
+}
+const buzz = (ms) => { try { if (navigator.userActivation?.hasBeenActive !== false) navigator.vibrate?.(ms); } catch {} };
+
+/* ======== puzzle: the board, which cars can leave, and the level maker ======== */
+// A car covers len squares in a row (axis 'h', going right from x) or a column (axis 'v', going down from y).
+// front is +1 or -1: which way along its axis the bonnet points. Grid squares hold 0 (empty), a car id or -1 (obstacle).
+// A pop-up bollard (b.popAt) blocks its square only while it's up.
+const cellsOf = (c) => Array.from({ length: c.len }, (_, i) => (c.axis === 'h' ? [c.x + i, c.y] : [c.x, c.y + i]));
+
+// can car c drive straight out towards sign (+1 = right/down, -1 = left/up)? If not: how many squares it can roll
+// first (dist) and what's in the way (hit: a car id, -1 for an obstacle, 'pop' or 'fence')
+function lane(b, c, sign) {
+  const along = c.axis === 'h', pos = along ? c.x : c.y, size = along ? b.w : b.h;
+  const start = sign > 0 ? pos + c.len : pos - 1;
+  for (let i = start; i >= 0 && i < size; i += sign) {
+    const k = along ? c.y * b.w + i : i * b.w + c.x, v = b.grid[k];
+    if (v && v !== c.id) return { ok: false, dist: Math.abs(i - start), hit: v, at: i };
+    if (b.popAt?.[k]?.up) return { ok: false, dist: Math.abs(i - start), hit: 'pop', at: i, pop: b.popAt[k] };
+  }
+  const fenced = along ? (sign > 0 ? b.fence.right[c.y] : b.fence.left[c.y]) : (sign > 0 ? b.fence.bottom[c.x] : b.fence.top[c.x]);
+  return fenced ? { ok: false, dist: sign > 0 ? size - start : start + 1, hit: 'fence' } : { ok: true };
+}
+const free = (b, c) => lane(b, c, 1).ok || lane(b, c, -1).ok;
+// the squares between car c and the edge, towards sign
+function laneCells(b, c, sign) {
+  const out = [], along = c.axis === 'h', pos = along ? c.x : c.y, size = along ? b.w : b.h;
+  for (let i = sign > 0 ? pos + c.len : pos - 1; i >= 0 && i < size; i += sign) out.push(along ? c.y * b.w + i : i * b.w + c.x);
+  return out;
+}
+
+// the rounds it takes if every car that can leave does at once (the puzzle's depth), and how many can go at the start
+function depthOf(b) {
+  const t = { ...b, grid: b.grid.slice(), popAt: null };
+  let left = b.cars.slice(), rounds = 0, firstFree = 0;
+  while (left.length) {
+    const go = left.filter((c) => free(t, c));
+    if (!go.length) return { rounds: Infinity, firstFree };
+    if (!rounds) firstFree = go.length;
+    for (const c of go) for (const [x, y] of cellsOf(c)) t.grid[y * t.w + x] = 0;
+    left = left.filter((c) => !go.includes(c));
+    rounds++;
+  }
+  return { rounds, firstFree };
+}
+
+// One try at a car park: obstacles and hedges, then cars packed in everywhere (the ones along an edge mostly lie along
+// it, so they shut each other in), then cars taken out until it can be emptied: while the cars that can go, going
+// round after round, leave some behind that never can, one of those is removed. Since a car that leaves only ever frees
+// squares, no tap can ever make a car park impossible. Last, cars that could go straight away are taken out until
+// there are spec.cars left.
+function attempt(spec, rnd) {
+  const { w, h } = spec;
+  const grid = new Array(w * h).fill(0);
+  const fence = { top: [], bottom: [], left: [], right: [] };
+  for (const side of ['top', 'bottom']) for (let x = 0; x < w; x++) fence[side][x] = rnd() < (spec.fence || 0);
+  for (const side of ['left', 'right']) for (let y = 0; y < h; y++) fence[side][y] = rnd() < (spec.fence || 0);
+  const obstacles = [];
+  for (let n = 0, tries = 0; n < (spec.obst || 0) && tries < 200; tries++) {
+    const x = Math.floor(rnd() * w), y = Math.floor(rnd() * h);
+    if (grid[y * w + x]) continue;
+    grid[y * w + x] = -1; obstacles.push({ x, y, kind: ['cone', 'tree', 'bollard'][Math.floor(rnd() * 3)] }); n++;
+  }
+  const b = { w, h, grid, fence, cars: [], obstacles };
+  const put = (c) => { for (const [x, y] of cellsOf(c)) grid[y * w + x] = c.id; b.cars.push(c); };
+  const take = (c) => { for (const [x, y] of cellsOf(c)) grid[y * w + x] = 0; b.cars = b.cars.filter((k) => k !== c); };
+  const order = Array.from({ length: w * h }, (_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+  let id = 1;
+  for (const i of order) {
+    const x = i % w, y = Math.floor(i / w);
+    if (grid[i]) continue;
+    const top = y === 0 || y === h - 1, side = x === 0 || x === w - 1;
+    let axes = rnd() < 0.5 ? ['h', 'v'] : ['v', 'h'];
+    if (top && !side && rnd() < 0.8) axes = ['h', 'v'];
+    if (side && !top && rnd() < 0.8) axes = ['v', 'h'];
+    const lens = rnd() < (spec.long || 0) ? [3, 2] : [2];
+    fit: for (const len of lens) for (const axis of axes) for (let back = 0; back < len; back++) {
+      const c = { id, x: axis === 'h' ? x - back : x, y: axis === 'v' ? y - back : y, len, axis };
+      if (c.x < 0 || c.y < 0 || (axis === 'h' ? c.x + len > w : c.y + len > h)) continue;
+      if (cellsOf(c).some(([cx, cy]) => grid[cy * w + cx])) continue;
+      put(c); id++; break fit;
+    }
+  }
+  for (;;) {
+    const t = { ...b, grid: grid.slice() };
+    let left = b.cars.slice();
+    for (let go; (go = left.filter((c) => free(t, c))).length;) {
+      for (const c of go) for (const [x, y] of cellsOf(c)) t.grid[y * w + x] = 0;
+      left = left.filter((c) => !go.includes(c));
+    }
+    if (!left.length) break;
+    take(left[Math.floor(rnd() * left.length)]);
+  }
+  while (b.cars.length > spec.cars) { const go = b.cars.filter((c) => free(b, c)); take(go[Math.floor(rnd() * go.length)]); }
+  // most cars face the nearer end of their row or column; the rest have to back out (beep, beep)
+  for (const c of b.cars) {
+    const mid = (c.axis === 'h' ? c.x + c.len / 2 - w / 2 : c.y + c.len / 2 - h / 2);
+    c.front = (rnd() < 0.65) === (mid >= 0) ? 1 : -1;
+  }
+  return b;
+}
+
+function makeBoard(level) {
+  if (level === 1) {   // the first car park, drawn by hand: one car shut in between two that can go
+    const b = { w: 3, h: 4, grid: new Array(12).fill(0), obstacles: [], spec: {},
+      fence: { top: [0, 0, 0], bottom: [0, 0, 0], left: [0, 0, 0, 0], right: [0, 0, 0, 0] },
+      cars: [{ id: 1, x: 0, y: 0, len: 2, axis: 'h', front: -1 }, { id: 2, x: 1, y: 1, len: 2, axis: 'v', front: 1 },
+        { id: 3, x: 1, y: 3, len: 2, axis: 'h', front: 1 }] };
+    for (const c of b.cars) for (const [x, y] of cellsOf(c)) b.grid[y * b.w + x] = c.id;
+    return b;
+  }
+  const spec = LEVELS[level - 1] || LEVELS[REPEAT_FROM + (level % (LEVELS.length - REPEAT_FROM))];
+  const rnd = rngFrom(level * 7919 + 13);
+  let best = null, bestScore = -Infinity;
+  for (let i = 0; i < 40; i++) {
+    const b = attempt(spec, rnd), d = depthOf(b);
+    // full car parks first, then a depth near the target, then not too many cars free at the start
+    const score = b.cars.length * 10 - Math.abs(d.rounds - spec.depth) * 6 - Math.max(0, d.firstFree - 3) * 2;
+    if (score > bestScore) { bestScore = score; best = b; }
+  }
+  best.spec = spec;
+  // pop-up bollards go on empty squares that some car has to drive through, nearer the edge first
+  best.pops = [];
+  const want = new Map();
+  for (const c of best.cars) for (const s of [1, -1]) {
+    const cells = laneCells(best, c, s), clear = cells.every((k) => !best.grid[k]);
+    cells.forEach((k, i) => { if (!best.grid[k]) want.set(k, Math.max(want.get(k) || 0, (clear ? 10 : 1) + i)); });
+  }
+  const spots = [...want.keys()].sort((a, b) => want.get(b) - want.get(a) || rnd() - 0.5);
+  for (const k of spots.slice(0, spec.pops || 0)) best.pops.push({ k, x: k % best.w, y: Math.floor(k / best.w) });
+  // sleepy cars: ones that can't leave straight away, so waking them is part of the order
+  const stuck = best.cars.filter((c) => !free(best, c));
+  for (let i = 0; i < (spec.sleepy || 0) && stuck.length; i++) stuck.splice(Math.floor(rnd() * stuck.length), 1)[0].sleepy = true;
+  return best;
+}
+
+/* ======== 3D scene: renderer, light, materials ======== */
+const canvas = $('#c'), stage = $('#stage');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// the sun's shadows are redrawn only while something moves (see the end of step()): most of the time nothing does,
+// and the shadow pass is about half of every frame
+renderer.shadowMap.autoUpdate = false;
+let shadowDirty = true, wasMoving = false;
+window.__tbxRenderer = renderer;   // read by the local telemetry collector (draw calls); nothing on Pages
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 400);
+const hemi = new THREE.HemisphereLight('#ffffff', '#7d9a5a', 1);
+const sun = new THREE.DirectionalLight('#fff4dd', 2.5);
+sun.castShadow = true;
+const SMALL = Math.min(screen.width, screen.height) < 500;   // a phone: a smaller shadow map is plenty
+sun.shadow.mapSize.set(SMALL ? 1024 : 2048, SMALL ? 1024 : 2048);
+sun.shadow.bias = -0.001;
+sun.shadow.normalBias = 0.02;
+scene.add(hemi, sun, sun.target);
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envCache = {};
+// a soft sky for reflections in paint and glass: a gradient ball with a bright patch where the sun is
+function envFor(th) {
+  if (envCache[th.sky]) return envCache[th.sky];
+  const s = new THREE.Scene(), geo = new THREE.SphereGeometry(10, 32, 16), col = [];
+  const top = new THREE.Color(th.sky), hor = new THREE.Color(th.horizon), gnd = new THREE.Color(th.grass[0]).multiplyScalar(0.5);
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i) / 10, c = y > 0 ? hor.clone().lerp(top, Math.pow(y, 0.6)) : hor.clone().lerp(gnd, Math.min(1, -y * 4));
+    col.push(c.r, c.g, c.b);
+  }
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const skyMat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide });
+  s.add(new THREE.Mesh(geo, skyMat));
+  const glowMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(th.sun[0]).multiplyScalar(th.night ? 1.5 : 5) });
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(1.4, 12, 8), glowMat);
+  glow.position.set(...th.sunDir).normalize().multiplyScalar(8); s.add(glow);
+  const tex = pmrem.fromScene(s, 0.03).texture;
+  geo.dispose(); glow.geometry.dispose(); skyMat.dispose(); glowMat.dispose();
+  return (envCache[th.sky] = tex);
+}
+
+const mats = {};
+const std = (color, rough = 0.7, metal = 0, extra = null) => {
+  const k = `${color}|${rough}|${metal}|${extra ? JSON.stringify(extra) : ''}`;
+  return (mats[k] ||= new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, ...extra }));
+};
+const paint = (c) => std(c, 0.3, 0.15);
+const GLASS = new THREE.MeshStandardMaterial({ color: '#22324f', roughness: 0.06, metalness: 0.4, envMapIntensity: 1.6 });
+const CHROME = std('#dfe3ea', 0.22, 0.9);
+const RUBBER = std('#24272e', 0.85, 0);
+const TRIM = std('#2c313b', 0.55, 0.1);
+const WHITE = new THREE.MeshBasicMaterial({ color: '#ffffff' });
+const INK = new THREE.MeshBasicMaterial({ color: '#1b1f2a' });
+const HEAD = new THREE.MeshStandardMaterial({ color: '#fff7d6', emissive: '#ffe9a8', emissiveIntensity: 0.4, roughness: 0.2 });
+const TAIL = new THREE.MeshStandardMaterial({ color: '#d0202a', emissive: '#a00010', emissiveIntensity: 0.4, roughness: 0.3 });
+const BULB = new THREE.MeshStandardMaterial({ color: '#fff6d8', emissive: '#ffd98a', emissiveIntensity: 0, roughness: 0.3 });
+const WINDOW = new THREE.MeshStandardMaterial({ color: '#2d4266', emissive: '#ffcf7a', emissiveIntensity: 0, roughness: 0.15, metalness: 0.3 });
+const geos = {};
+const boxGeo = (w, h, d) => (geos[`b${w},${h},${d}`] ||= new THREE.BoxGeometry(w, h, d));
+
+function box(parent, w, h, d, mat, x, y, z, shadow = true) {
+  const m = new THREE.Mesh(boxGeo(w, h, d), mat);
+  m.position.set(x, y, z); m.castShadow = shadow; m.receiveShadow = true; parent.add(m); return m;
+}
+// a closed outline through pts with every corner rounded by r
+function shapeOf(pts, r) {
+  const s = new THREE.Shape(), P = pts.map(([x, y]) => new THREE.Vector2(x, y)), n = P.length;
+  for (let i = 0; i < n; i++) {
+    const p = P[i], a = P[(i + n - 1) % n], b = P[(i + 1) % n];
+    const s0 = p.clone().add(a.clone().sub(p).setLength(Math.min(r, p.distanceTo(a) / 2)));
+    const s1 = p.clone().add(b.clone().sub(p).setLength(Math.min(r, p.distanceTo(b) / 2)));
+    if (i === 0) s.moveTo(s0.x, s0.y); else s.lineTo(s0.x, s0.y);
+    s.quadraticCurveTo(p.x, p.y, s1.x, s1.y);
+  }
+  s.closePath();
+  return s;
+}
+// a side outline [x, y] pushed out to width d across the car (z), with rounded corners and softened edges
+function solid(parent, pts, d, mat, r = 0.06, bevel = 0.05) {
+  const key = `s${pts.join(';')}|${d}|${r}|${bevel}`;
+  if (!geos[key]) {
+    const depth = Math.max(0.002, d - bevel * 2);
+    geos[key] = new THREE.ExtrudeGeometry(shapeOf(pts, r), { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel,
+      bevelOffset: -bevel, bevelSegments: bevel >= 0.04 ? 2 : 1, curveSegments: r >= 0.08 ? 4 : 2 }).translate(0, 0, -depth / 2);
+  }
+  const m = new THREE.Mesh(geos[key], mat); m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
+}
+// a rounded box: w along x, h up, d across
+function rbox(parent, w, h, d, mat, x, y, z, r = 0.04) {
+  const m = solid(parent, [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]], d, mat, r, Math.min(r, d / 3, w / 3, h / 3));
+  m.position.set(x, y, z); return m;
+}
+const disc = (r, d, bevel) => (geos[`d${r},${d},${bevel}`] ||= (() => {
+  const s = new THREE.Shape(); s.absarc(0, 0, r, 0, Math.PI * 2, false);
+  const depth = Math.max(0.002, d - bevel * 2);
+  return new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelOffset: -bevel, bevelSegments: 1, curveSegments: 7 }).translate(0, 0, -depth / 2);
+})());
+function wheels(parent, xs, z, r) {
+  for (const x of xs) for (const s of [-1, 1]) {
+    const t = new THREE.Mesh(disc(r, 0.17, 0.045), RUBBER); t.position.set(x, r, s * z); t.castShadow = true; parent.add(t);
+    const hub = new THREE.Mesh(disc(r * 0.5, 0.19, 0.02), CHROME); hub.position.set(x, r, s * z); parent.add(hub);
+    const arch = new THREE.Mesh(geos.arch ||= new THREE.CircleGeometry(1, 16, 0, Math.PI), TRIM);
+    arch.scale.setScalar(r + 0.035); arch.position.set(x, r, s * (z + 0.072)); if (s < 0) arch.rotation.y = Math.PI; parent.add(arch);
+  }
+}
+// cartoon eyes on the windscreen, from p0 (bottom) to p1 (top) of its outline; the brows show when the car is cross
+function eyes(parent, [x0, y0], [x1, y1], r, gap) {
+  const g = new THREE.Group();
+  const up = new THREE.Vector3(x1 - x0, y1 - y0, 0).normalize();
+  const n = new THREE.Vector3(up.y, -up.x, 0);
+  const side = new THREE.Vector3().crossVectors(up, n);
+  g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side, up, n));
+  g.position.set((x0 + x1) / 2 + n.x * 0.012, (y0 + y1) / 2 + n.y * 0.012, 0);
+  const lids = new THREE.Group(); g.add(lids);
+  const brows = [], circle = (geos.eye ||= new THREE.CircleGeometry(1, 22)), ring = (geos.ring ||= new THREE.RingGeometry(0.86, 1, 22));
+  for (const s of [-1, 1]) {
+    const add = (geo, mat, sc, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.scale.setScalar(sc); m.position.set(x, y, z); lids.add(m); };
+    add(circle, WHITE, r, s * gap, 0, 0);
+    add(ring, INK, r, s * gap, 0, 0.002);
+    add(circle, INK, r * 0.5, s * gap + r * 0.08, -r * 0.18, 0.004);
+    add(circle, WHITE, r * 0.17, s * gap + r * 0.24, r * 0.02, 0.006);
+    const b = box(g, r * 1.7, r * 0.42, 0.01, INK, s * gap, r * 1.2, 0.008, false); b.rotation.z = s * 0.45; b.visible = false; brows.push(b);
+  }
+  parent.add(g);
+  return { group: g, lids, brows };
+}
+
+// Every mesh under group (except the ones in keep) is baked into as few meshes as possible: plain coloured parts all
+// become one mesh with the colours stored per corner (one draw call, one shadow), and glass, lights and the eyes keep
+// a mesh per material. A full car park has thousands of little parts, so this keeps phones smooth.
+const BODY = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.42, metalness: 0.1 });
+const bakeable = (m) => m.isMeshStandardMaterial && m !== BODY && !m.map && m !== GLASS && m.emissive.getHex() === 0 && !m.transparent;
+function flatten(group, keep = []) {
+  group.updateMatrixWorld(true);
+  const inv = group.matrixWorld.clone().invert(), byMat = new Map();
+  const walk = (o) => {
+    for (const k of o.children) {
+      if (keep.includes(k)) continue;
+      if (k.isMesh && k.visible) {
+        let g = k.geometry.clone().applyMatrix4(inv.clone().multiply(k.matrixWorld));
+        if (g.index) g = g.toNonIndexed();
+        let mat = k.material;
+        if (bakeable(mat)) {
+          const n = g.attributes.position.count, col = new Float32Array(n * 3);
+          for (let i = 0; i < n; i++) { col[i * 3] = mat.color.r; col[i * 3 + 1] = mat.color.g; col[i * 3 + 2] = mat.color.b; }
+          g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+          mat = BODY;
+        }
+        if (!byMat.has(mat)) byMat.set(mat, []);
+        byMat.get(mat).push({ g, shadow: k.castShadow });
+      }
+      walk(k);
+    }
+  };
+  walk(group);
+  for (const k of [...group.children]) if (!keep.includes(k)) group.remove(k);
+  for (const [mat, list] of byMat) {
+    const n = list.reduce((a, { g }) => a + g.attributes.position.array.length, 0);
+    const pos = new Float32Array(n), nor = new Float32Array(n), col = mat === BODY ? new Float32Array(n) : null;
+    let o = 0;
+    for (const { g } of list) {
+      pos.set(g.attributes.position.array, o); nor.set(g.attributes.normal.array, o);
+      if (col) col.set(g.attributes.color.array, o);
+      o += g.attributes.position.array.length; g.dispose();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    if (col) geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const m = new THREE.Mesh(geo, mat);
+    m.castShadow = (mat === BODY || mat === GLASS) && list.some((p) => p.shadow); m.receiveShadow = !(mat instanceof THREE.MeshBasicMaterial);
+    group.add(m);
+  }
+}
+
+/* ======== canvas textures ======== */
+function canvasTex(w, h, draw, repeat) {
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h; draw(cv.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat, repeat); }
+  return t;
+}
+function speckle(g, w, h, n, colors, size, alpha = 1) {
+  g.globalAlpha = alpha;
+  for (let i = 0; i < n; i++) { g.fillStyle = colors[i % colors.length]; const s = size * (0.5 + Math.random()); g.fillRect(Math.random() * w, Math.random() * h, s, s); }
+  g.globalAlpha = 1;
+}
+function blot(g, x, y, r, color, alpha) {
+  const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, color); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.globalAlpha = alpha; g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;
+}
+function asphalt(g, w, h, base, dots) {
+  g.fillStyle = base; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < (w * h) / 9000; i++) blot(g, Math.random() * w, Math.random() * h, 30 + Math.random() * 60, Math.random() < 0.5 ? '#000' : '#fff', 0.035);
+  speckle(g, w, h, (w * h) / 40, dots, 2.2, 0.55);
+}
+// round, soft and see-through: puffs, glows, shadows under cars
+const SOFT = canvasTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.5, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
+const SHADOW = canvasTex(64, 64, (g) => { g.filter = 'blur(7px)'; g.fillStyle = '#000'; g.beginPath(); g.roundRect(12, 12, 40, 40, 12); g.fill(); });
+const STAR = canvasTex(64, 64, (g) => {
+  g.fillStyle = '#fff'; g.beginPath();
+  for (let i = 0; i < 10; i++) { const r = i % 2 ? 12 : 30, a = -Math.PI / 2 + i * Math.PI / 5; g.lineTo(32 + Math.cos(a) * r, 32 + Math.sin(a) * r); }
+  g.closePath(); g.fill();
+});
+const ZED = canvasTex(64, 64, (g) => { g.font = 'bold 52px Verdana'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 8; g.strokeStyle = '#23324a'; g.strokeText('z', 32, 30); g.fillStyle = '#fff'; g.fillText('z', 32, 30); });
+const BEAM = canvasTex(64, 64, (g) => {
+  const gr = g.createLinearGradient(0, 0, 64, 0); gr.addColorStop(0, 'rgba(255,240,190,.9)'); gr.addColorStop(1, 'rgba(255,240,190,0)');
+  g.fillStyle = gr; g.beginPath(); g.moveTo(0, 26); g.lineTo(64, 4); g.lineTo(64, 60); g.lineTo(0, 38); g.fill();
+});
+const grassCache = {};
+function grassTex(th) {
+  return (grassCache[th.grass[0]] ||= canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = th.grass[0]; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 14; i++) blot(g, Math.random() * w, Math.random() * h, 30 + Math.random() * 50, th.grass[i % 2 ? 1 : 2], 0.5);
+    speckle(g, w, h, 2600, [th.grass[1], th.grass[2]], 2.5, 0.8);
+    if (th.flowers) speckle(g, w, h, 40, ['#fff', '#ffe066', '#ff9ec7'], 3);
+  }, 60));
+}
+const PAVING = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#d9d3c6'; g.fillRect(0, 0, w, h); speckle(g, w, h, 900, ['#cfc8ba', '#e3ddd1'], 2, 0.7);
+  g.strokeStyle = 'rgba(120,110,95,.35)'; g.lineWidth = 2;
+  for (let i = 0; i <= 4; i++) { g.beginPath(); g.moveTo(i * 32, 0); g.lineTo(i * 32, h); g.stroke(); g.beginPath(); g.moveTo(0, i * 32); g.lineTo(w, i * 32); g.stroke(); }
+}, 1);
+
+/* ======== the vehicles ======== */
+// Built along +x (the bonnet), centred on 0; len 2 or 3 squares. Each kind gives its windscreen line for the eyes.
+const KINDS2 = ['sedan', 'sedan', 'hatch', 'hatch', 'suv', 'beetle', 'van', 'pickup', 'taxi', 'police', 'ambulance', 'icecream'];
+const KINDS3 = ['bus', 'bus', 'fire', 'lorry', 'mixer'];
+function buildCar(kind, color, rnd) {
+  const root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  const flash = [], P = paint(color);
+  let face, big = false, spinner = null, L = 0.86;
+  const roofColor = rnd() < 0.25 ? '#f4f4f0' : color;
+  const front = (x, y, w = 0.84) => {   // bumpers, grille and lights at the front (x) and back (-x)
+    rbox(body, 0.08, 0.1, w, TRIM, x, y, 0, 0.03); rbox(body, 0.08, 0.1, w, TRIM, -x, y, 0, 0.03);
+    for (const z of [-0.27, 0.27]) {
+      const h = new THREE.Mesh(disc(0.065, 0.05, 0.01), HEAD); h.rotation.y = Math.PI / 2; h.position.set(x + 0.035, y + 0.14, z); body.add(h);
+      rbox(body, 0.04, 0.07, 0.14, TAIL, -x - 0.025, y + 0.14, z, 0.01);
+    }
+  };
+  const sedanLike = (M, roofM, lower, cabin, roof, eyesAt, pillar) => {
+    solid(body, lower, 0.8, M, 0.09, 0.07);
+    solid(body, cabin, 0.68, GLASS, 0.05, 0.03);
+    solid(body, roof, 0.7, roofM, 0.03, 0.03);
+    rbox(body, 0.06, 0.22, 0.705, M, pillar, 0.6, 0, 0.02);
+    for (const z of [-0.43, 0.43]) rbox(body, 0.07, 0.05, 0.08, M, eyesAt[0][0] - 0.06, eyesAt[0][1] + 0.04, z, 0.02);
+    face = eyes(body, ...eyesAt, 0.075, 0.13);
+    wheels(body, [0.55, -0.55], 0.33, 0.17);
+    front(0.84, 0.2);
+  };
+  if (kind === 'sedan' || kind === 'taxi' || kind === 'police') {
+    const M = paint(kind === 'taxi' ? '#ffc21a' : kind === 'police' ? '#f6f7fb' : color);
+    sedanLike(M, kind === 'police' ? paint('#1f3c88') : kind === 'taxi' ? M : paint(roofColor), [[-0.86, 0.15], [0.86, 0.15], [0.88, 0.42], [0.34, 0.48], [-0.62, 0.5], [-0.88, 0.46]],
+      [[-0.6, 0.47], [0.36, 0.47], [0.12, 0.72], [-0.42, 0.72]], [[-0.44, 0.7], [0.15, 0.7], [0.12, 0.77], [-0.41, 0.77]],
+      [[0.36, 0.47], [0.12, 0.72]], -0.13);
+    if (kind === 'police') {
+      rbox(body, 0.9, 0.13, 0.81, paint('#1f3c88'), -0.05, 0.3, 0, 0.03);
+      flash.push(rbox(body, 0.14, 0.08, 0.24, std('#ff3b3b', 0.3, 0, { emissive: '#ff2020', emissiveIntensity: 0.6 }), -0.14, 0.81, -0.15, 0.03),
+        rbox(body, 0.14, 0.08, 0.24, std('#3b7bff', 0.3, 0, { emissive: '#2050ff', emissiveIntensity: 0.6 }), -0.14, 0.81, 0.15, 0.03));
+    }
+    if (kind === 'taxi') {
+      rbox(body, 0.16, 0.1, 0.36, std('#23324a', 0.5), -0.15, 0.82, 0, 0.03);
+      for (let i = 0; i < 4; i++) box(body, 0.1, 0.05, 0.02, i % 2 ? WHITE : INK, -0.88 + 0.36 + i * 0.32, 0.3, 0.405, false);
+    }
+  } else if (kind === 'hatch') {
+    sedanLike(P, paint(roofColor), [[-0.84, 0.15], [0.86, 0.15], [0.88, 0.42], [0.34, 0.48], [-0.84, 0.5]],
+      [[-0.8, 0.47], [0.36, 0.47], [0.12, 0.74], [-0.76, 0.74]], [[-0.78, 0.72], [0.15, 0.72], [0.12, 0.79], [-0.76, 0.79]],
+      [[0.36, 0.47], [0.12, 0.74]], -0.25);
+  } else if (kind === 'beetle') {
+    solid(body, [[-0.84, 0.15], [0.84, 0.15], [0.86, 0.34], [0.5, 0.46], [-0.6, 0.46], [-0.86, 0.36]], 0.8, P, 0.17, 0.08);
+    solid(body, [[-0.58, 0.42], [0.3, 0.42], [0.06, 0.74], [-0.36, 0.74]], 0.68, GLASS, 0.14, 0.04);
+    solid(body, [[-0.36, 0.71], [0.08, 0.71], [0.05, 0.78], [-0.33, 0.78]], 0.6, P, 0.04, 0.03);
+    for (const x of [0.55, -0.55]) for (const z of [-0.36, 0.36]) { const f = new THREE.Mesh(geos.fender ||= new THREE.SphereGeometry(0.22, 14, 10), P); f.scale.set(1.15, 0.85, 0.5); f.position.set(x, 0.26, z); f.castShadow = true; body.add(f); }
+    face = eyes(body, [0.3, 0.42], [0.06, 0.74], 0.08, 0.13);
+    wheels(body, [0.55, -0.55], 0.36, 0.16);
+    front(0.84, 0.18, 0.78);
+  } else if (kind === 'suv' || kind === 'pickup') {
+    solid(body, [[-0.86, 0.2], [0.86, 0.2], [0.88, 0.5], [0.42, 0.56], [-0.86, 0.58]], 0.82, P, 0.09, 0.07);
+    if (kind === 'suv') {
+      solid(body, [[-0.82, 0.55], [0.44, 0.55], [0.24, 0.84], [-0.8, 0.84]], 0.7, GLASS, 0.05, 0.03);
+      solid(body, [[-0.82, 0.82], [0.26, 0.82], [0.24, 0.88], [-0.8, 0.88]], 0.72, paint(roofColor), 0.03, 0.03);
+      rbox(body, 0.06, 0.26, 0.725, P, -0.28, 0.69, 0, 0.02);
+      for (const z of [-0.25, 0.25]) rbox(body, 0.9, 0.04, 0.04, CHROME, -0.28, 0.92, z, 0.015);
+      const spare = new THREE.Mesh(disc(0.17, 0.12, 0.04), RUBBER); spare.rotation.y = Math.PI / 2; spare.position.set(-0.93, 0.48, 0); spare.castShadow = true; body.add(spare);
+      face = eyes(body, [0.44, 0.55], [0.24, 0.84], 0.08, 0.14);
+    } else {
+      solid(body, [[-0.12, 0.55], [0.44, 0.55], [0.24, 0.84], [-0.1, 0.84]], 0.7, GLASS, 0.05, 0.03);
+      solid(body, [[-0.12, 0.82], [0.26, 0.82], [0.24, 0.88], [-0.1, 0.88]], 0.72, paint(roofColor), 0.03, 0.03);
+      rbox(body, 0.04, 0.2, 0.8, TRIM, -0.84, 0.66, 0, 0.02);
+      for (const z of [-0.38, 0.38]) rbox(body, 0.72, 0.2, 0.05, P, -0.5, 0.66, z, 0.02);
+      rbox(body, 0.3, 0.22, 0.3, std('#b98a55'), -0.55, 0.69, -0.12, 0.03);
+      const melon = new THREE.Mesh(geos.melon ||= new THREE.SphereGeometry(0.15, 14, 10), std('#3d8a3a', 0.5)); melon.scale.set(1.2, 0.9, 0.9); melon.position.set(-0.45, 0.7, 0.18); melon.castShadow = true; body.add(melon);
+      face = eyes(body, [0.44, 0.55], [0.24, 0.84], 0.08, 0.14);
+    }
+    wheels(body, [0.55, -0.55], 0.34, 0.19);
+    front(0.85, 0.24);
+  } else if (kind === 'van' || kind === 'ambulance' || kind === 'icecream') {
+    const c = kind === 'ambulance' ? '#f6f7fb' : kind === 'icecream' ? '#ffd0e4' : color, V = paint(c);
+    solid(body, [[-0.86, 0.15], [0.86, 0.15], [0.88, 0.44], [0.6, 0.5], [0.36, 0.94], [-0.86, 0.94]], 0.8, V, 0.1, 0.07);
+    solid(body, [[0.4, 0.54], [0.555, 0.54], [0.38, 0.88], [0.26, 0.88]], 0.7, GLASS, 0.03, 0.02);
+    rbox(body, 0.8, 0.22, 0.81, GLASS, -0.3, 0.72, 0, 0.04);
+    face = eyes(body, [0.555, 0.54], [0.38, 0.88], 0.085, 0.15);
+    wheels(body, [0.55, -0.55], 0.33, 0.17);
+    front(0.85, 0.2);
+    if (kind === 'ambulance') {
+      rbox(body, 1.74, 0.08, 0.81, paint('#e5484d'), 0, 0.5, 0, 0.03);
+      rbox(body, 0.36, 0.03, 0.12, paint('#e5484d'), -0.3, 0.96, 0, 0.01); rbox(body, 0.12, 0.03, 0.36, paint('#e5484d'), -0.3, 0.96, 0, 0.01);
+      flash.push(rbox(body, 0.12, 0.08, 0.2, std('#3b7bff', 0.3, 0, { emissive: '#2050ff', emissiveIntensity: 0.6 }), 0.28, 0.98, -0.18, 0.03),
+        rbox(body, 0.12, 0.08, 0.2, std('#3b7bff', 0.3, 0, { emissive: '#2050ff', emissiveIntensity: 0.6 }), 0.28, 0.98, 0.18, 0.03));
+    } else if (kind === 'icecream') {
+      rbox(body, 1.74, 0.07, 0.81, paint('#7fd3ff'), 0, 0.48, 0, 0.03);
+      const cone = new THREE.Mesh(geos.icone ||= new THREE.ConeGeometry(0.17, 0.42, 14).rotateX(Math.PI), std('#d9a05b', 0.8)); cone.position.set(-0.3, 1.16, 0); cone.castShadow = true; body.add(cone);
+      for (const [y, col, s] of [[1.36, '#ff8fc0', 0.19], [1.52, '#9ee6c0', 0.16]]) { const b = new THREE.Mesh(geos.scoop ||= new THREE.SphereGeometry(1, 16, 12), std(col, 0.6)); b.scale.setScalar(s); b.position.set(-0.3, y, 0); b.castShadow = true; body.add(b); }
+      const cherry = new THREE.Mesh(geos.scoop, std('#e0202a', 0.3)); cherry.scale.setScalar(0.06); cherry.position.set(-0.3, 1.7, 0); body.add(cherry);
+    } else {
+      rbox(body, 1.74, 0.06, 0.81, paint('#f4f4f0'), 0, 0.5, 0, 0.02);
+    }
+  } else {
+    big = true; L = 1.38;
+    if (kind === 'bus') {
+      const c = rnd() < 0.5 ? '#ffc21a' : color, B = paint(c);
+      solid(body, [[-1.38, 0.15], [1.38, 0.15], [1.4, 0.66], [1.26, 1.0], [-1.38, 1.0]], 0.84, B, 0.12, 0.08);
+      rbox(body, 2.3, 0.26, 0.85, GLASS, -0.14, 0.78, 0, 0.05);
+      solid(body, [[1.2, 0.62], [1.415, 0.62], [1.415, 0.66], [1.29, 0.96], [1.16, 0.96]], 0.74, GLASS, 0.03, 0.02);
+      rbox(body, 2.78, 0.06, 0.85, TRIM, 0, 0.4, 0, 0.02);
+      rbox(body, 0.7, 0.12, 0.5, std('#e8ebef', 0.5), -0.3, 1.04, 0, 0.04);
+      face = eyes(body, [1.415, 0.66], [1.29, 0.96], 0.1, 0.18);
+      wheels(body, [0.92, -0.88], 0.35, 0.2);
+      front(1.38, 0.22, 0.86);
+    } else {
+      const cabColor = kind === 'fire' ? '#e5484d' : kind === 'mixer' ? '#ff8a1f' : color, C = paint(cabColor);
+      rbox(body, 2.76, 0.18, 0.78, TRIM, 0, 0.3, 0, 0.04);
+      solid(body, [[0.5, 0.2], [1.38, 0.2], [1.4, 0.62], [1.2, 0.96], [0.5, 0.96]], 0.84, C, 0.1, 0.07);
+      solid(body, [[1.0, 0.62], [1.415, 0.62], [1.235, 0.92], [1.0, 0.92]], 0.74, GLASS, 0.03, 0.02);
+      rbox(body, 0.36, 0.24, 0.85, GLASS, 0.8, 0.76, 0, 0.04);
+      face = eyes(body, [1.415, 0.62], [1.235, 0.92], 0.09, 0.16);
+      wheels(body, [0.95, -0.45, -0.98], 0.35, 0.19);
+      front(1.38, 0.22, 0.86);
+      if (kind === 'fire') {
+        rbox(body, 1.86, 0.52, 0.84, paint('#d0302f'), -0.45, 0.62, 0, 0.06);
+        for (const z of [-0.425, 0.425]) for (let i = 0; i < 3; i++) rbox(body, 0.5, 0.36, 0.02, std('#b82424', 0.5), -1.05 + i * 0.6, 0.62, z, 0.02);
+        for (const z of [-0.2, 0.2]) rbox(body, 2.3, 0.05, 0.06, CHROME, -0.25, 0.94, z, 0.02);
+        for (let i = 0; i < 8; i++) box(body, 0.05, 0.04, 0.4, CHROME, -1.3 + i * 0.3, 0.94, 0);
+        flash.push(rbox(body, 0.14, 0.09, 0.24, std('#ff3b3b', 0.3, 0, { emissive: '#ff2020', emissiveIntensity: 0.6 }), 0.8, 1.02, -0.2, 0.03),
+          rbox(body, 0.14, 0.09, 0.24, std('#3b7bff', 0.3, 0, { emissive: '#2050ff', emissiveIntensity: 0.6 }), 0.8, 1.02, 0.2, 0.03));
+      } else if (kind === 'lorry') {
+        rbox(body, 1.92, 0.7, 0.88, std('#f4f2ec', 0.6), -0.42, 0.76, 0, 0.05);
+        for (const y of [0.56, 0.66]) rbox(body, 1.94, 0.05, 0.9, paint(y > 0.6 ? color : '#ffd23f'), -0.42, y, 0, 0.02);
+      } else {
+        const prof = [[0.01, -0.62], [0.3, -0.55], [0.38, -0.2], [0.36, 0.25], [0.22, 0.6], [0.01, 0.66]].map(([x, y]) => new THREE.Vector2(x, y));
+        const drum = new THREE.Group(), spin = new THREE.Group(); drum.position.set(-0.4, 0.78, 0); drum.rotation.z = Math.PI / 2 + 0.22; drum.add(spin);
+        const dm = new THREE.Mesh(geos.drum ||= new THREE.LatheGeometry(prof, 18), std('#f4f2ec', 0.45, 0.2)); dm.castShadow = true; spin.add(dm);
+        for (let i = 0; i < 3; i++) { const band = new THREE.Mesh(geos.band ||= new THREE.TorusGeometry(0.37, 0.025, 6, 20), paint('#ff8a1f')); band.rotation.x = Math.PI / 2 + 0.5; band.rotation.y = i * 2.1; band.position.y = -0.15 + i * 0.18; band.scale.setScalar(1 - i * 0.06); spin.add(band); }
+        body.add(drum); spinner = spin; spinner.userData.mount = drum;
+      }
+    }
+  }
+  flatten(face.lids);
+  flatten(body, [...flash, face.group, ...(spinner ? [spinner.userData.mount] : [])]);
+  // soft shadow right under the car, so it sits on the ground
+  const shade = new THREE.Mesh(new THREE.PlaneGeometry(L * 2 + 0.3, 1.05).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ map: SHADOW, color: '#000', transparent: true, opacity: 0.45, depthWrite: false }));
+  shade.position.y = 0.025; shade.renderOrder = 1; root.add(shade);
+  // headlight beams, at night
+  const beam = new THREE.Mesh(geos.beam ||= new THREE.PlaneGeometry(1.8, 1.2).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ map: BEAM, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }));
+  beam.position.set(L + 0.95, 0.03, 0); beam.visible = false; root.add(beam);
+  return { root, body, flash, face, big, half: L, spinner, beam };
+}
+
+/* ======== obstacles, hedges and the scenery ======== */
+function buildObstacle(kind, th) {
+  const g = new THREE.Group();
+  if (kind === 'cone') {
+    rbox(g, 0.46, 0.05, 0.46, std('#ff7a1a', 0.6), 0, 0.025, 0, 0.03);
+    const c = new THREE.Mesh(geos.cone ||= new THREE.ConeGeometry(0.19, 0.6, 18), std('#ff7a1a', 0.5)); c.position.y = 0.35; c.castShadow = true; g.add(c);
+    const s = new THREE.Mesh(geos.stripe ||= new THREE.CylinderGeometry(0.1, 0.13, 0.12, 18), std('#ffffff', 0.4)); s.position.y = 0.4; g.add(s);
+  } else if (kind === 'tree') {
+    const pot = new THREE.Mesh(geos.pot ||= new THREE.CylinderGeometry(0.38, 0.33, 0.3, 18), std('#c9c1b2', 0.9)); pot.position.y = 0.15; pot.castShadow = true; g.add(pot);
+    const soil = new THREE.Mesh(geos.soil ||= new THREE.CircleGeometry(0.34, 18).rotateX(-Math.PI / 2), std(th.snow ? '#f4f7fb' : '#6b4a33', 1)); soil.position.y = 0.301; g.add(soil);
+    const trunk = new THREE.Mesh(geos.trunk ||= new THREE.CylinderGeometry(0.05, 0.07, 0.6, 8), std('#8b5a3c', 0.9)); trunk.position.y = 0.55; g.add(trunk);
+    for (const [x, y, z, s] of [[0, 1.0, 0, 0.34], [0.14, 0.9, 0.08, 0.24], [-0.12, 0.92, -0.08, 0.25]]) {
+      const top = new THREE.Mesh(geos.leaf ||= new THREE.IcosahedronGeometry(1, 1), std(th.snow ? '#e9f0f6' : th.leaves[0], 0.85)); top.scale.setScalar(s); top.position.set(x, y, z); top.castShadow = true; g.add(top);
+    }
+  } else {
+    const p = new THREE.Mesh(geos.post ||= new THREE.CylinderGeometry(0.11, 0.12, 0.7, 16), std('#ffd23f', 0.5)); p.position.y = 0.35; p.castShadow = true; g.add(p);
+    for (const y of [0.25, 0.5]) { const r = new THREE.Mesh(geos.pring ||= new THREE.CylinderGeometry(0.122, 0.122, 0.08, 16), std('#23324a', 0.5)); r.position.y = y; g.add(r); }
+    const cap = new THREE.Mesh(geos.pcap ||= new THREE.SphereGeometry(0.11, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), std('#ffd23f', 0.5)); cap.position.y = 0.7; g.add(cap);
+  }
+  return g;
+}
+// a pop-up bollard: a steel plate in the ground with a striped post that rises out of it, red light on top
+function buildPop() {
+  const g = new THREE.Group(), post = new THREE.Group();
+  const plate = new THREE.Mesh(geos.plate ||= new THREE.CylinderGeometry(0.24, 0.26, 0.03, 20), std('#8d949e', 0.35, 0.8)); plate.position.y = 0.025; plate.receiveShadow = true; g.add(plate);
+  const p = new THREE.Mesh(geos.pop ||= new THREE.CylinderGeometry(0.13, 0.13, 0.72, 18), std('#f2f3f5', 0.35, 0.3)); p.position.y = 0.36; p.castShadow = true; post.add(p);
+  for (const y of [0.18, 0.42]) { const r = new THREE.Mesh(geos.popring ||= new THREE.CylinderGeometry(0.133, 0.133, 0.1, 18), std('#e5484d', 0.4)); r.position.y = y; post.add(r); }
+  const light = new THREE.Mesh(geos.poplight ||= new THREE.SphereGeometry(0.09, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: '#ff5050', emissive: '#ff1010', emissiveIntensity: 0, roughness: 0.3 }));
+  light.position.y = 0.72; light.userData.own = true; post.add(light);
+  g.add(post);
+  return { g, post, light };
+}
+function tree(parent, x, z, s, th, rnd) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.scale.setScalar(s); g.rotation.y = rnd() * 6;
+  const pine = th.snow || rnd() < 0.35;
+  const trunk = new THREE.Mesh(geos.trunk2 ||= new THREE.CylinderGeometry(0.09, 0.14, 0.9, 8), std('#7d5236', 0.9)); trunk.position.y = 0.45; trunk.castShadow = true; g.add(trunk);
+  if (pine) {
+    for (const [y, sc] of [[1.0, 1], [1.5, 0.78], [1.95, 0.55]]) {
+      const c = new THREE.Mesh(geos.pine ||= new THREE.ConeGeometry(0.7, 0.9, 9), std(th.snow || th.fallen ? '#2f7a4a' : th.leaves[2], 0.85)); c.position.y = y; c.scale.setScalar(sc); c.castShadow = true; g.add(c);
+      if (th.snow) { const w = new THREE.Mesh(geos.pine, std('#f6f9fc', 0.7)); w.position.y = y + 0.18 * sc; w.scale.setScalar(sc * 0.62); g.add(w); }
+    }
+  } else {
+    const col = th.leaves[Math.floor(rnd() * th.leaves.length)];
+    for (const [px, py, pz, ps] of [[0, 1.35, 0, 0.62], [0.36, 1.15, 0.1, 0.45], [-0.32, 1.2, -0.12, 0.48], [0.05, 1.7, 0.05, 0.42]]) {
+      const b = new THREE.Mesh(geos.leaf ||= new THREE.IcosahedronGeometry(1, 1), std(col, 0.85)); b.position.set(px, py, pz); b.scale.setScalar(ps); b.castShadow = true; g.add(b);
+    }
+  }
+  parent.add(g);
+}
+function bush(parent, x, z, s, th, rnd) {
+  const col = th.snow ? '#eef3f8' : th.leaves[Math.floor(rnd() * th.leaves.length)];
+  for (let i = 0; i < 3; i++) {
+    const b = new THREE.Mesh(geos.leaf ||= new THREE.IcosahedronGeometry(1, 1), std(col, 0.85));
+    b.position.set(x + (rnd() - 0.5) * 0.5 * s, 0.18 * s, z + (rnd() - 0.5) * 0.5 * s); b.scale.set(0.32 * s, 0.26 * s, 0.32 * s); b.castShadow = true; parent.add(b);
+  }
+}
+function lamp(parent, x, z, ry) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.rotation.y = ry;
+  box(g, 0.16, 0.08, 0.16, std('#3a404a', 0.5, 0.4), 0, 0.04, 0);
+  const pole = new THREE.Mesh(geos.lpole ||= new THREE.CylinderGeometry(0.035, 0.05, 2.1, 8), std('#3a404a', 0.5, 0.4)); pole.position.y = 1.05; pole.castShadow = true; g.add(pole);
+  rbox(g, 0.5, 0.05, 0.06, std('#3a404a', 0.5, 0.4), 0.22, 2.08, 0, 0.02);
+  rbox(g, 0.26, 0.08, 0.18, std('#3a404a', 0.5, 0.4), 0.42, 2.04, 0, 0.03);
+  box(g, 0.2, 0.03, 0.13, BULB, 0.42, 1.99, 0, false);
+  parent.add(g);
+  const at = new THREE.Vector3(0.42, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), ry).add(g.position);
+  return at;
+}
+function building(parent, x, z, w, d, h, color, kind, th, rnd) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); parent.add(g);
+  const roofCol = th.snow ? '#f4f7fb' : ['#c8553d', '#8a5a44', '#5b6b8a', '#6f8b5a'][Math.floor(rnd() * 4)];
+  rbox(g, w, h, d, std(color, 0.85), 0, h / 2, 0, 0.04);
+  if (kind === 'house') {
+    solid(g, [[-w / 2 - 0.1, 0], [w / 2 + 0.1, 0], [0, 0.6]], d + 0.12, std(roofCol, 0.8), 0.03, 0.03).position.set(0, h, 0);
+    rbox(g, 0.18, 0.4, 0.18, std('#9a6b55', 0.9), w * 0.25, h + 0.42, -d * 0.1, 0.02);
+  } else {
+    rbox(g, w + 0.06, 0.1, d + 0.06, std(th.snow ? '#f4f7fb' : '#e9e4da', 0.8), 0, h + 0.05, 0, 0.03);
+  }
+  const fz = d / 2 + 0.012, rows = h > 1.4 ? 2 : 1;
+  for (let r = 0; r < rows; r++) for (let i = 0; i < Math.max(2, Math.round(w / 0.7)); i++) {
+    const n = Math.max(2, Math.round(w / 0.7)), wx = -w / 2 + (i + 0.5) * w / n, wy = r === 0 ? 0.5 : 1.15;
+    if (r === 0 && i === Math.floor(n / 2)) { box(g, 0.32, 0.6, 0.04, std('#6b4a3a', 0.8), wx, 0.3, fz, false); continue; }
+    box(g, kind === 'shop' && r === 0 ? 0.5 : 0.3, kind === 'shop' && r === 0 ? 0.42 : 0.3, 0.04, WINDOW, wx, wy, fz, false);
+    box(g, (kind === 'shop' && r === 0 ? 0.5 : 0.3) + 0.06, 0.05, 0.06, std('#f4f2ec', 0.8), wx, wy - (kind === 'shop' && r === 0 ? 0.24 : 0.18), fz, false);
+  }
+  if (kind === 'shop') {
+    const a = rnd() < 0.5 ? '#e5484d' : '#2f9e6f';
+    for (let i = 0; i < 6; i++) { const s = box(g, w / 6, 0.04, 0.42, std(i % 2 ? '#ffffff' : a, 0.8), -w / 2 + (i + 0.5) * w / 6, 0.95, fz + 0.18); s.rotation.x = 0.35; }
+  }
+}
+function duck(parent, mother, rnd) {
+  const g = new THREE.Group(), s = mother ? 1.3 : 0.75;
+  const col = mother ? (rnd() < 0.5 ? '#ffffff' : '#a07850') : '#ffd84a';
+  const b = new THREE.Mesh(geos.duck ||= new THREE.SphereGeometry(1, 16, 12), std(col, 0.7)); b.scale.set(0.2 * s, 0.13 * s, 0.13 * s); b.position.y = 0.13 * s; b.castShadow = true; g.add(b);
+  const tail = new THREE.Mesh(geos.duck, std(col, 0.7)); tail.scale.set(0.07 * s, 0.05 * s, 0.07 * s); tail.position.set(-0.19 * s, 0.2 * s, 0); g.add(tail);
+  const head = new THREE.Mesh(geos.duck, std(mother && col === '#a07850' ? '#2f7a4a' : col, 0.7)); head.scale.setScalar(0.09 * s); head.position.set(0.15 * s, 0.3 * s, 0); head.castShadow = true; g.add(head);
+  const beak = new THREE.Mesh(geos.beak ||= new THREE.ConeGeometry(0.035, 0.09, 8).rotateZ(-Math.PI / 2), std('#ff9a1f', 0.5)); beak.scale.setScalar(s); beak.position.set(0.25 * s, 0.28 * s, 0); g.add(beak);
+  for (const z of [-0.04, 0.04]) { const e = new THREE.Mesh(geos.deye ||= new THREE.SphereGeometry(0.016, 8, 6), INK); e.scale.setScalar(s); e.position.set(0.2 * s, 0.33 * s, z * s); g.add(e); }
+  const body = new THREE.Group(); body.add(g); parent.add(body);
+  return body;
+}
+
+/* ======== the level: building the car park ======== */
+const R = 0.85;          // the road's centre line, out from the car park's edge
+const ROAD_W = 1.3;
+const WALK = 0.55;       // the pavement beyond the road
+const EXIT_RUN = 12;     // how far cars drive down the exit road before they're gone
+const GATE_AT = 2.4;     // the barrier, down the exit road from the corner
+let board, cars = [], props = [], pops = [], world = null, level = 1, gate = null, hedges = {}, theme = THEMES.day;
+let ducks = null, fall = null, lampPools = [];
+let taps = 0, bumps = 0, startedAt = 0, hintIn = HINT_DELAY, playing = false, won = false, order = 0;
+
+const W2 = () => board.w / 2, H2 = () => board.h / 2;
+const cellX = (x) => x + 0.5 - W2(), cellZ = (y) => y + 0.5 - H2();
+const homeOf = (c) => (c.axis === 'h' ? new THREE.Vector3(c.x + c.len / 2 - W2(), 0, cellZ(c.y)) : new THREE.Vector3(cellX(c.x), 0, c.y + c.len / 2 - H2()));
+const axisOf = (c) => (c.axis === 'h' ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 0, 1));
+const yawOf = (dx, dz) => Math.atan2(-dz, dx);
+const zebraZ = () => H2() + R + GATE_AT + 1.1;
+
+function clearWorld() {
+  if (!world) return;
+  const shared = new Set(Object.values(geos));
+  world.traverse((o) => {
+    if (o.geometry && !shared.has(o.geometry)) o.geometry.dispose();
+    const m = o.material;
+    if (m) { if (m.map?.userData.own) m.map.dispose(); if (m.userData.own) m.dispose(); }
+  });
+  scene.remove(world); world = null;
+  for (const f of fx) { scene.remove(f.s); f.s.material.dispose(); }
+  fx.length = 0;
+  for (const el of document.querySelectorAll('.bubble')) el.remove();
+}
+const ownTex = (t) => { t.userData.own = true; return t; };
+
+// the car park's own surface: asphalt, white bay lines, a yellow edge and the odd oil stain
+function lotTexture(w, h) {
+  const px = 96;
+  return ownTex(canvasTex(w * px, h * px, (g, W, H) => {
+    asphalt(g, W, H, '#8e959f', ['#7d848e', '#a3aab4', '#6f767f']);
+    for (let i = 0; i < (w * h) / 5; i++) { const x = (Math.floor(Math.random() * w) + 0.5) * px, y = (Math.floor(Math.random() * h) + 0.5) * px; blot(g, x + (Math.random() - 0.5) * 30, y + (Math.random() - 0.5) * 30, 18 + Math.random() * 14, '#2a2e35', 0.35); }
+    g.strokeStyle = 'rgba(250,250,245,.92)'; g.lineWidth = 5; g.lineCap = 'round';
+    for (let x = 1; x < w; x++) { g.beginPath(); g.moveTo(x * px, 6); g.lineTo(x * px, H - 6); g.stroke(); }
+    for (let y = 1; y < h; y++) { g.beginPath(); g.moveTo(6, y * px); g.lineTo(W - 6, y * px); g.stroke(); }
+    g.strokeStyle = '#f2c53d'; g.lineWidth = 8; g.strokeRect(5, 5, W - 10, H - 10);
+  }));
+}
+// the road round the car park: asphalt with white edge lines and arrows, and a kerb round the car park itself
+function ringTexture(w, h) {
+  const px = 64, out = R + ROAD_W / 2, Wr = w + out * 2, Hr = h + out * 2;
+  return ownTex(canvasTex(Math.round(Wr * px), Math.round(Hr * px), (g, W, H) => {
+    asphalt(g, W, H, '#4a505a', ['#3f454e', '#596069', '#353a42']);
+    const u = (v) => v * px, kerb = R - ROAD_W / 2;   // kerb: from the car park's edge to the road
+    g.fillStyle = '#d6d0c3'; g.fillRect(u(out - kerb - 0.02), u(out - kerb - 0.02), u(w + kerb * 2 + 0.04), u(h + kerb * 2 + 0.04));
+    g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 4;
+    const e = 0.1;
+    g.strokeRect(u(out - kerb - e - 0.02), u(out - kerb - e - 0.02), u(w + (kerb + e) * 2 + 0.04), u(h + (kerb + e) * 2 + 0.04));
+    g.beginPath(); g.moveTo(u(e), H - u(e)); g.lineTo(u(e), u(e)); g.lineTo(W - u(e), u(e)); g.lineTo(W - u(e), H); g.moveTo(u(e), H - u(e)); g.lineTo(W - u(ROAD_W + e), H - u(e)); g.stroke();
+    const arrow = (x, y, a) => { g.save(); g.translate(u(x), u(y)); g.rotate(a); g.fillStyle = 'rgba(255,255,255,.88)'; g.beginPath(); g.moveTo(16, 0); g.lineTo(-8, -12); g.lineTo(-3, 0); g.lineTo(-8, 12); g.closePath(); g.fill(); g.restore(); };
+    const cy = out - R, cx = out - R;
+    for (let x = 1; x < w; x += 2) { arrow(out + x, cy, 0); arrow(out + x, Hr - cy, 0); }
+    for (let y = 1; y < h; y += 2) { arrow(cx, out + y, Math.PI / 2); arrow(Wr - cx, out + y, Math.PI / 2); }
+  }));
+}
+// the exit road: edge lines, a zebra crossing for the ducks, and arrows past the barrier
+function exitTexture() {
+  const px = 64, len = EXIT_RUN + 4;
+  return ownTex(canvasTex(Math.round(ROAD_W * px), len * px, (g, W, H) => {
+    asphalt(g, W, H, '#4a505a', ['#3f454e', '#596069', '#353a42']);
+    g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(6, 0); g.lineTo(6, H); g.moveTo(W - 6, 0); g.lineTo(W - 6, H); g.stroke();
+    const zy = (zebraZ() - (H2() + R + ROAD_W / 2)) * px;
+    g.fillStyle = 'rgba(255,255,255,.92)';
+    for (let x = 8; x < W - 8; x += 18) g.fillRect(x, zy - 22, 10, 44);
+    for (let y = zy + 1.4 * px; y < H; y += 2.5 * px) { g.beginPath(); g.moveTo(W / 2, y + 16); g.lineTo(W / 2 - 12, y - 8); g.lineTo(W / 2, y - 3); g.lineTo(W / 2 + 12, y - 8); g.closePath(); g.fill(); }
+  }));
+}
+function plane(parent, w, d, mat, x, y, z) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2), mat);
+  m.position.set(x, y, z); m.receiveShadow = true; parent.add(m); return m;
+}
+function decal(parent, map, w, d, x, z, color, opacity, additive) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ map, color, transparent: true, opacity, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending }));
+  m.material.userData.own = true; m.position.set(x, 0.04, z); m.renderOrder = 2; parent.add(m); return m;
+}
+
+function applyTheme(th) {
+  theme = th;
+  scene.background = new THREE.Color(th.fog);
+  scene.environment = envFor(th);
+  hemi.color.set(th.hemi[0]); hemi.groundColor.set(th.hemi[1]); hemi.intensity = th.hemi[2];
+  sun.color.set(th.sun[0]); sun.intensity = th.sun[1];
+  renderer.toneMappingExposure = th.exposure;
+  BULB.emissiveIntensity = th.night ? 3 : th.lamps ? 1.2 : 0;
+  WINDOW.emissiveIntensity = th.night ? 1.4 : th.lamps ? 0.35 : 0;
+  HEAD.emissiveIntensity = th.night ? 2.2 : 0.4;
+  TAIL.emissiveIntensity = th.night ? 1.4 : 0.4;
+}
+
+function buildLevel(n) {
+  clearWorld();
+  level = n; board = makeBoard(n); cardDue = false; shadowDirty = true; cars = []; props = []; pops = []; hedges = {}; won = false; order = 0; lampPools = [];
+  taps = 0; bumps = 0; startedAt = performance.now(); hintIn = n === 1 ? FIRST_HINT : HINT_DELAY;
+  board.popAt = {}; board.reserved = new Map();
+  outlines = new Map();
+  zones = [{ kind: 'junction', rect: box2(W2() + R, H2() + R, 0, ROAD_W / 2 + 0.2, ROAD_W / 2 + 0.2), owner: null, entered: false }];
+  const rnd = rngFrom(n * 131 + 7), th = themeFor(n);
+  applyTheme(th);
+  world = new THREE.Group(); scene.add(world);
+  const w = board.w, h = board.h, out = R + ROAD_W / 2;
+  const cx = W2() + R, cz = H2() + R, ox = W2() + out, oz = H2() + out;   // road centre lines; outer road edges
+  // ground, road ring, exit road, car park
+  const own = (opts) => { const m = new THREE.MeshStandardMaterial(opts); m.userData.own = true; return m; };
+  plane(world, 240, 240, own({ map: grassTex(th), roughness: 0.95 }), 0, -0.01, 0);
+  plane(world, w + out * 2, h + out * 2, own({ map: ringTexture(w, h), roughness: 0.9 }), 0, 0, 0);
+  plane(world, ROAD_W, EXIT_RUN + 4, own({ map: exitTexture(), roughness: 0.9 }), cx, 0, oz + (EXIT_RUN + 4) / 2);
+  plane(world, w, h, own({ map: lotTexture(w, h), roughness: 0.85 }), 0, 0.012, 0);
+  // pavements round the road and along the exit road
+  const decor = new THREE.Group(); world.add(decor);
+  const walkMat = own({ map: PAVING, color: th.snow ? '#f2f5f8' : '#ffffff', roughness: 0.9 });
+  const walk = (x0, z0, x1, z1) => { const m = rbox(decor, x1 - x0, 0.08, z1 - z0, walkMat, (x0 + x1) / 2, 0.03, (z0 + z1) / 2, 0.02); m.castShadow = false; };
+  walk(-ox - WALK, -oz - WALK, ox + WALK, -oz);
+  walk(-ox - WALK, -oz, -ox, oz + WALK);
+  walk(-ox, oz, cx - ROAD_W / 2, oz + WALK);
+  walk(ox, -oz, ox + WALK, oz + EXIT_RUN + 4);
+  walk(cx - ROAD_W / 2 - WALK, oz + WALK, cx - ROAD_W / 2, oz + EXIT_RUN + 4);
+  // hedges where there's no way out
+  const hedgeMat = std(th.snow ? '#e6eef4' : th.leaves[th.leaves.length > 3 ? 2 : 0], 0.9);
+  const hedgeAt = (key, x, z, along) => {
+    const m = rbox(world, along ? 0.94 : 0.26, 0.4, along ? 0.26 : 0.94, hedgeMat, x, 0.2, z, 0.1);
+    if (!along) { m.rotation.y = 0; }
+    hedges[key] = m;
+  };
+  for (let x = 0; x < w; x++) {
+    if (board.fence.top[x]) hedgeAt('t' + x, cellX(x), -H2() - 0.1, true);
+    if (board.fence.bottom[x]) hedgeAt('b' + x, cellX(x), H2() + 0.1, true);
+  }
+  for (let y = 0; y < h; y++) {
+    if (board.fence.left[y]) hedgeAt('l' + y, -W2() - 0.1, cellZ(y), false);
+    if (board.fence.right[y]) hedgeAt('r' + y, W2() + 0.1, cellZ(y), false);
+  }
+  // the barrier at the exit and its little hut (on the left of the exit road; the duck pond is on the right)
+  const gx = cx, gz = cz + GATE_AT;
+  const hut = new THREE.Group(); hut.position.set(gx - ROAD_W / 2 - WALK - 0.55, 0, gz + 0.3); decor.add(hut);
+  rbox(hut, 0.72, 0.8, 0.72, std('#f4f1ea', 0.8), 0, 0.4, 0, 0.04);
+  rbox(hut, 0.9, 0.08, 0.9, std('#e5484d', 0.6), 0, 0.84, 0, 0.03);
+  rbox(hut, 0.74, 0.28, 0.5, WINDOW, 0, 0.52, 0, 0.03);
+  const pivot = new THREE.Group(); pivot.position.set(gx - ROAD_W / 2 - 0.08, 0.55, gz); world.add(pivot);
+  rbox(world, 0.16, 0.6, 0.16, std('#23324a', 0.5), gx - ROAD_W / 2 - 0.08, 0.3, gz, 0.03);
+  for (let i = 0; i < 5; i++) rbox(pivot, 0.28, 0.08, 0.08, std(i % 2 ? '#ffffff' : '#e5484d', 0.5), 0.14 + i * 0.28, 0, 0, 0.02);
+  gate = { pivot, x: gx, z: gz, angle: 0, open: false };
+  // lamps on the pavement corners, with a pool of light under each at night
+  const lamps = [lamp(decor, -ox - 0.25, -oz - 0.25, Math.PI * 0.25), lamp(decor, ox + 0.25, -oz - 0.25, Math.PI * 0.75),
+    lamp(decor, -ox - 0.25, oz + 0.25, -Math.PI * 0.25)];
+  if (h >= 6) lamps.push(lamp(decor, -ox - WALK - 1.4, 0, 0), lamp(decor, ox + WALK + 1.4, 0, Math.PI));
+  if (th.lamps) for (const p of lamps) lampPools.push(decal(world, SOFT, 3.4, 3.4, p.x, p.z, '#ffcf7a', th.night ? 0.7 : 0.25, true));
+  // buildings along the far side, facing the car park
+  const rowZ = -oz - WALK - 2.1;
+  for (let x = -ox - 1.2, i = 0; x < ox + 1.6; i++) {
+    const bw = 1.6 + rnd() * 1.2, bh = 1.0 + rnd() * 1.0, kind = rnd() < 0.45 ? 'shop' : 'house';
+    building(decor, x + bw / 2, rowZ - 0.1 - rnd() * 0.3, bw, 1.6, bh, ['#f3e2c4', '#cfe3ef', '#f6d0c6', '#dfe8c9', '#e8d7f0', '#fff1b8'][Math.floor(rnd() * 6)], kind, th, rnd);
+    x += bw + 0.25;
+  }
+  // the duck pond on the right of the exit road
+  const pond = { x: cx + ROAD_W / 2 + WALK + 1.4, z: zebraZ() + 0.3 };
+  const water = new THREE.Mesh(geos.pondw ||= new THREE.CircleGeometry(1, 28).rotateX(-Math.PI / 2), std(th.snow ? '#cfe6f5' : '#4fa3d9', th.snow ? 0.3 : 0.08, 0.1));
+  water.scale.set(1.15, 1, 0.75); water.position.set(pond.x, 0.03, pond.z); water.receiveShadow = true; world.add(water);
+  const rim = new THREE.Mesh(geos.pondr ||= new THREE.RingGeometry(0.95, 1.12, 28).rotateX(-Math.PI / 2), std(th.snow ? '#e8eef3' : '#cdb98e', 0.9));
+  rim.scale.set(1.15, 1, 0.75); rim.position.set(pond.x, 0.028, pond.z); world.add(rim);
+  if (!th.snow) for (let i = 0; i < 7; i++) {
+    const a = rnd() * Math.PI * 2, reed = new THREE.Mesh(geos.reed ||= new THREE.CylinderGeometry(0.015, 0.02, 0.45, 5), std('#4f8a3a', 0.8));
+    reed.position.set(pond.x + Math.cos(a) * 1.15, 0.22, pond.z + Math.sin(a) * 0.78); reed.rotation.z = (rnd() - 0.5) * 0.3; reed.castShadow = true; decor.add(reed);
+  }
+  // trees, bushes and flowers round the outside, kept off the roads, pavements and buildings
+  const busy = (x, z, m) => (Math.abs(x) < ox + WALK + m && Math.abs(z) < oz + WALK + m)
+    || (z > oz && Math.abs(x - cx) < ROAD_W / 2 + WALK + m) || (z < -oz - WALK && z > rowZ - 1.2 && Math.abs(x) < ox + 2)
+    || Math.hypot((x - pond.x) / 1.4, (z - pond.z) / 1.0) < 1 + m || Math.hypot(x - hut.position.x, z - hut.position.z) < 0.8 + m
+    || Math.hypot(x - (cx - ROAD_W / 2 - WALK - 1.6), z - (zebraZ() + 0.6)) < 0.8 + m;
+  for (let i = 0, tries = 0; i < 30 && tries < 600; tries++) {
+    const x = (rnd() - 0.5) * (w + 18), z = (rnd() - 0.5) * (h + 18);
+    if (busy(x, z, 1.7)) continue;
+    tree(decor, x, z, 0.75 + rnd() * 0.45, th, rnd); i++;
+  }
+  for (let i = 0, tries = 0; i < 16 && tries < 400; tries++) {
+    const x = (rnd() - 0.5) * (w + 10), z = (rnd() - 0.5) * (h + 10);
+    if (busy(x, z, 1.25)) continue;
+    bush(decor, x, z, 0.9 + rnd() * 0.5, th, rnd); i++;
+  }
+  if (th.flowers || th.fallen) for (let i = 0, tries = 0; i < 70 && tries < 700; tries++) {
+    const x = (rnd() - 0.5) * (w + 12), z = (rnd() - 0.5) * (h + 12);
+    if (busy(x, z, 0.1)) continue;
+    const col = th.fallen ? th.leaves[Math.floor(rnd() * th.leaves.length)] : ['#ffffff', '#ffe066', '#ff8fbf', '#b98cff'][Math.floor(rnd() * 4)];
+    const f = new THREE.Mesh(geos.petal ||= new THREE.CircleGeometry(0.07, 6).rotateX(-Math.PI / 2), std(col, 0.8)); f.position.set(x, 0.012, z); decor.add(f); i++;
+  }
+  if (th.snow) for (const [x, z] of [[-ox - 0.6, -oz - 0.6], [ox + 0.7, -oz - 0.5], [-ox - 0.7, oz + 0.6]]) {
+    const pile = new THREE.Mesh(geos.duck ||= new THREE.SphereGeometry(1, 16, 12), std('#f7fafd', 0.8)); pile.scale.set(0.5, 0.22, 0.4); pile.position.set(x, 0, z); pile.castShadow = true; decor.add(pile);
+  }
+  flatten(decor);
+  // obstacles
+  for (const o of board.obstacles) {
+    const m = buildObstacle(o.kind, th); m.position.set(cellX(o.x), 0, cellZ(o.y)); m.rotation.y = rnd() * 6; world.add(m);
+    props.push({ ...o, mesh: m, wob: 0 });
+  }
+  // pop-up bollards
+  (board.pops || []).forEach((p, i) => {
+    const v = buildPop(); v.g.position.set(cellX(p.x), 0, cellZ(p.y)); world.add(v.g);
+    const pop = { ...p, ...v, state: 'down', t: 1.5 + i * 1.4, up: false, h: 0, wob: 0 };
+    pops.push(pop); board.popAt[p.k] = pop;
+  });
+  // cars
+  for (const c of board.cars) {
+    const kind = c.len === 3 ? KINDS3[Math.floor(rnd() * KINDS3.length)] : KINDS2[Math.floor(rnd() * KINDS2.length)];
+    const v = buildCar(kind, COLORS[Math.floor(rnd() * COLORS.length)], rnd);
+    const home = homeOf(c), ax = axisOf(c);
+    v.root.position.copy(home);
+    v.root.rotation.y = yawOf(ax.x * c.front, ax.z * c.front);
+    const hit = new THREE.Mesh(boxGeo(c.len - 0.04, 1, 0.98), WHITE); hit.visible = false; hit.position.y = 0.5;
+    hit.rotation.y = c.axis === 'h' ? 0 : Math.PI / 2; hit.position.add(home); world.add(hit);
+    world.add(v.root);
+    const car = { ...c, kind, ...v, hit, home, ax, state: 'parked', off: 0, shake: 0, cross: 0, blink: 1 + rnd() * 4,
+      pos: home.clone(), yaw: v.root.rotation.y, pitch: 0, roll: 0, hop: 0, pv: 0, zIn: rnd() };
+    if (car.sleepy) car.face.lids.scale.y = 0.1;
+    hit.userData.car = car;
+    cars.push(car);
+  }
+  // ducks, resting on the pond until it's time to cross
+  ducks = null;
+  if (board.spec.ducks) {
+    const list = [];
+    for (let i = 0; i < 4; i++) {
+      const m = duck(world, i === 0, rnd);
+      const d = { mesh: m, pos: new THREE.Vector3(pond.x + (i - 1.5) * 0.35, 0.02, pond.z + (i % 2 ? 0.2 : -0.15)), yaw: Math.PI, half: 0.12, state: 'duck', blockers: [], hop: 0, i };
+      m.position.copy(d.pos); list.push(d);
+    }
+    const zz = zebraZ(), edge = [pond.x - 0.9, zz], kerb = [cx - ROAD_W / 2 - WALK - 0.5, zz], rest = [cx - ROAD_W / 2 - WALK - 1.6, zz + 0.6];
+    const road = ROAD_W / 2 + 0.3;   // how far either side of the road's middle counts as on the road
+    const walkOf = (pts) => {
+      const dist = [0]; for (let i = 1; i < pts.length; i++) dist.push(dist[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+      const w = { path: pts, dist, total: dist[dist.length - 1] };
+      for (let s = 0; s <= w.total; s += 0.02) if (Math.abs(along(w, s).x - cx) < road + 0.15) { w.in ??= s; w.out = s; }   // where the road starts and ends
+      return w;
+    };
+    ducks = { list, side: 'pond', walking: false, t: 0, nextIn: 5 + rnd() * 5, pond, rest,
+      toGrass: walkOf([edge, kerb, rest]), toPond: walkOf([rest, kerb, edge]),
+      zone: { kind: 'crossing', rect: box2(cx, zz, 0, road, 0.45), owner: null } };
+    zones.push(ducks.zone);
+  }
+  // falling snow or leaves
+  fall = null;
+  if (th.fall) {
+    const N = th.fall === 'snow' ? 500 : 60, span = Math.max(w, h) + 10, pos = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - 0.5) * span; pos[i * 3 + 1] = Math.random() * 8; pos[i * 3 + 2] = (Math.random() - 0.5) * span; }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ map: SOFT, size: th.fall === 'snow' ? 0.32 : 0.3, transparent: true, depthWrite: false,
+      color: th.fall === 'snow' ? '#ffffff' : th.leaves[0] }));
+    pts.material.userData.own = true; world.add(pts);
+    fall = { pts, span, kind: th.fall };
+  }
+  // sun and shadows sized to this car park
+  const span = Math.max(w, h) / 2 + 7;
+  Object.assign(sun.shadow.camera, { left: -span, right: span, top: span, bottom: -span, near: 1, far: 80 });
+  sun.shadow.camera.updateProjectionMatrix();
+  sun.position.set(...th.sunDir).normalize().multiplyScalar(30); sun.target.position.set(0, 0, 0);
+  updateHud();
+  intro = REDUCED ? 1 : 0;
+  fit();
+  window.tbxEvent?.('level-start', { level, theme: THEME_ORDER.find((k) => THEMES[k] === th) });
+}
+
+/* ======== camera: fit the car park to the screen ======== */
+let view = { w: 1, h: 1 }, camGoal = new THREE.Vector3(), camTarget = new THREE.Vector3(), intro = 1;
+function fit() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  view = { w, h };
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  if (!board) return;
+  const out = R + ROAD_W / 2;
+  const x0 = -W2() - out - 0.1, x1 = W2() + R + 1.5, z0 = -H2() - out - 0.1, z1 = zebraZ() + 0.6;
+  const target = new THREE.Vector3((x0 + x1) / 2, 0, (z0 + z1) / 2);
+  // the car park's long side goes along the screen's long side: from the south on a tall screen, from the west on a wide one
+  const tall = h >= w, el = THREE.MathUtils.degToRad(tall ? 60 : 56);
+  const dir = (board.h >= board.w) === tall ? new THREE.Vector3(0, Math.sin(el), Math.cos(el)) : new THREE.Vector3(-Math.cos(el), Math.sin(el), 0);
+  const pts = [];
+  for (const x of [x0, x1]) for (const z of [z0, z1]) for (const y of [0, 1]) pts.push(new THREE.Vector3(x, y, z));
+  const top = (70 + 10) / h * 2, side = 14 / w * 2, bottom = 16 / h * 2;
+  let lo = 2, hi = 300;
+  for (let i = 0; i < 32; i++) {
+    const d = (lo + hi) / 2;
+    camera.position.copy(target).addScaledVector(dir, d); camera.lookAt(target); camera.updateMatrixWorld(); camera.updateProjectionMatrix();
+    const fits = pts.every((p) => { const v = p.clone().project(camera); return Math.abs(v.x) <= 1 - side && v.y <= 1 - top && v.y >= -1 + bottom; });
+    if (fits) hi = d; else lo = d;
+  }
+  camGoal.copy(target).addScaledVector(dir, hi); camTarget.copy(target);
+  scene.fog = new THREE.Fog(theme.fog, hi * 1.5, hi * 4);
+  placeCamera();
+}
+// at the start of a car park the camera swings in from higher up and round to the side
+function placeCamera() {
+  const k = ease(clamp(intro, 0, 1));
+  const off = camGoal.clone().sub(camTarget);
+  off.applyAxisAngle(new THREE.Vector3(0, 1, 0), (1 - k) * 0.6).multiplyScalar(1 + (1 - k) * 0.35);
+  camera.position.copy(camTarget).add(off);
+  camera.lookAt(camTarget); camera.updateMatrixWorld(); camera.updateProjectionMatrix();
+}
+addEventListener('resize', fit);
+new ResizeObserver(fit).observe(stage);
+
+/* ======== HUD ======== */
+const toScreen = (v) => { const p = v.clone().project(camera); return { x: (p.x + 1) / 2 * view.w, y: (1 - p.y) / 2 * view.h, on: p.z < 1 }; };
+function updateHud() {
+  $('#lvl').textContent = level;
+  $('#count').textContent = cars.filter((c) => c.state === 'parked' || c.state === 'bump' || (c.state === 'leave' && !c.outOfLot)).length;
+}
+function bubble(car, text) {
+  const el = document.createElement('div'); el.className = 'bubble'; el.textContent = text;
+  stage.appendChild(el);
+  const place = () => { const p = toScreen(car.pos.clone().setY(car.big ? 1.5 : 1.15)); el.style.left = p.x + 'px'; el.style.top = p.y + 'px'; };
+  place(); el._place = place;
+  setTimeout(() => el.remove(), 950);
+}
+const hand = $('#hand');
+let hintCar = null;
+function showHint() {
+  hintCar = cars.find((c) => c.state === 'parked' && free(board, c));
+  if (hintCar && level === 1) help('say-tap');
+  hand.classList.toggle('on', !!hintCar);
+}
+function hideHint() { hintCar = null; hand.classList.remove('on'); }
+
+/* ======== little effects: puffs, dust, stars and Zzz ======== */
+const fx = [];
+function spawn(map, pos, vel, life, size, color, grow = 1, alpha = 1) {
+  if (fx.length > 160) return;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map, color, transparent: true, depthWrite: false }));
+  s.position.copy(pos); s.scale.setScalar(size); scene.add(s);
+  fx.push({ s, vel, life, max: life, size, grow, alpha });
+}
+function stepFx(dt) {
+  for (let i = fx.length - 1; i >= 0; i--) {
+    const f = fx[i];
+    f.life -= dt;
+    if (f.life <= 0) { scene.remove(f.s); f.s.material.dispose(); fx.splice(i, 1); continue; }
+    f.s.position.addScaledVector(f.vel, dt);
+    const k = 1 - f.life / f.max;
+    f.s.scale.setScalar(f.size * (1 + k * f.grow));
+    f.s.material.opacity = Math.min(1, (f.life / f.max) * 2.2) * f.alpha;
+  }
+}
+const facing = (c) => new THREE.Vector3(Math.cos(c.yaw), 0, -Math.sin(c.yaw));
+function exhaust(c, n) {
+  const back = facing(c).multiplyScalar(-(c.half + 0.12));
+  for (let i = 0; i < n; i++) spawn(SOFT, c.pos.clone().add(back).setY(0.22), back.clone().setLength(0.3 + Math.random() * 0.3).add(new THREE.Vector3((Math.random() - 0.5) * 0.3, 0.45, (Math.random() - 0.5) * 0.3)),
+    0.7 + Math.random() * 0.4, 0.22, theme.night ? '#9aa6b8' : '#e9edf2', 2.2, 0.7);
+}
+function dust(at, n = 6) {
+  for (let i = 0; i < n; i++) spawn(SOFT, at.clone().setY(0.15), new THREE.Vector3((Math.random() - 0.5) * 1.4, 0.3 + Math.random() * 0.5, (Math.random() - 0.5) * 1.4),
+    0.5 + Math.random() * 0.3, 0.2, theme.snow ? '#ffffff' : '#cbbfa8', 1.6, 0.8);
+}
+function stars(at) {
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2;
+    spawn(STAR, at.clone().setY(0.8), new THREE.Vector3(Math.cos(a) * 1.4, 1.6 + Math.random(), Math.sin(a) * 1.4), 0.7, 0.26, ['#ffd23f', '#ffffff', '#ff9ec7'][i % 3], 0.2);
+  }
+}
+
+/* ======== playing: taps and swipes ======== */
+const ray = new THREE.Raycaster(), ptr = new THREE.Vector2();
+let down = null;
+function aim(e) {
+  const r = canvas.getBoundingClientRect();
+  ptr.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ptr, camera);
+}
+function carAt(e) {
+  aim(e);
+  const hits = ray.intersectObjects(cars.filter((c) => c.state === 'parked').map((c) => c.hit), false);
+  return hits.length ? { car: hits[0].object.userData.car, point: hits[0].point } : null;
+}
+function duckAt(e) {
+  if (!ducks) return null;
+  aim(e);
+  const hits = ray.intersectObjects(ducks.list.map((d) => d.mesh), true);
+  return hits.length ? ducks.list.find((d) => { let o = hits[0].object; while (o && o !== d.mesh) o = o.parent; return o; }) : null;
+}
+canvas.addEventListener('pointerdown', (e) => {
+  sfx.init();
+  if (!playing) return;
+  down = { x: e.clientX, y: e.clientY, hit: carAt(e) };
+});
+canvas.addEventListener('pointerup', (e) => {
+  if (!playing || !down) return;
+  const d = down; down = null;
+  const dx = e.clientX - d.x, dy = e.clientY - d.y, moved = Math.hypot(dx, dy);
+  const hit = moved < 14 ? carAt(e) || d.hit : d.hit;
+  if (!hit || hit.car.state !== 'parked') {
+    // a tap on a duck: quack!
+    const dk = moved < 14 && duckAt(e);
+    if (dk) { sfx.quack(); for (const o of ducks.list) o.hop = 1; }
+    return;
+  }
+  const c = hit.car;
+  let sign, forced = false;
+  if (moved >= 30) {
+    // a swipe along the car picks the way it goes
+    const a = toScreen(c.home), b = toScreen(c.home.clone().add(c.ax));
+    const ax = b.x - a.x, ay = b.y - a.y, dot = (ax * dx + ay * dy) / (Math.hypot(ax, ay) * moved);
+    if (Math.abs(dot) < 0.45) return;
+    sign = Math.sign(dot); forced = true;
+  } else {
+    // a tap: the half that was tapped (bonnet or boot) goes first, else whichever way is clear
+    sign = Math.sign(hit.point.clone().sub(c.home).dot(c.ax)) || c.front;
+  }
+  tapCar(c, sign, forced);
+});
+canvas.addEventListener('pointercancel', () => { down = null; });
+
+function tapCar(c, sign, forced) {
+  taps++; hideHint(); hintIn = HINT_DELAY;
+  sfx.tap();
+  if (c.sleepy) return wake(c);
+  if (!forced && !lane(board, c, sign).ok && lane(board, c, -sign).ok) sign = -sign;
+  const l = lane(board, c, sign);
+  if (l.ok) leave(c, sign); else bump(c, sign, l);
+}
+function wake(c) {
+  c.sleepy = false; c.hop = 1; c.face.lids.scale.y = 1; c.blink = 2;
+  sfx.yawn(); bubble(c, '❗');
+}
+
+// The way out: straight out of its space to a turning point far enough out that the car can turn on the spot without
+// sweeping over the car park (long ones turn on the pavement's edge), then back to the middle of the road, round to
+// the bottom-right corner and down past the barrier.
+function exitPath(c, sign) {
+  const p = c.home, cx = W2() + R, cz = H2() + R;
+  const rho = Math.hypot(c.half + LONG_PAD, WIDE), out = rho + 0.06, merge = c.half + 0.7;
+  let pts;
+  if (c.axis === 'h' && sign > 0) pts = [[p.x, p.z], [W2() + out, p.z], [cx, Math.min(p.z + merge, cz)]];
+  else if (c.axis === 'h') pts = [[p.x, p.z], [-W2() - out, p.z], [-cx, Math.min(p.z + merge, cz)], [-cx, cz]];
+  else if (sign < 0) pts = [[p.x, p.z], [p.x, -H2() - out], [Math.min(p.x + merge, cx), -cz], [cx, -cz]];
+  else pts = [[p.x, p.z], [p.x, H2() + out], [Math.min(p.x + merge, cx), cz]];
+  pts.push([cx, cz], [cx, cz + EXIT_RUN]);
+  pts = pts.filter((q, i, all) => i === 0 || Math.hypot(q[0] - all[i - 1][0], q[1] - all[i - 1][1]) > 1e-6);
+  // round the corners on the road; the turning point stays sharp (the car stops there and turns on the spot)
+  const path = [pts[0], pts[1]];
+  for (let i = 2; i < pts.length - 1; i++) {
+    const [a, b, n] = [pts[i - 1], pts[i], pts[i + 1]];
+    const din = Math.hypot(b[0] - a[0], b[1] - a[1]), dout = Math.hypot(n[0] - b[0], n[1] - b[1]);
+    const r = Math.min(0.6, din / 2, dout / 2);
+    const s0 = [b[0] - (b[0] - a[0]) / din * r, b[1] - (b[1] - a[1]) / din * r], e = [b[0] + (n[0] - b[0]) / dout * r, b[1] + (n[1] - b[1]) / dout * r];
+    for (let k = 0; k <= 8; k++) { const t = k / 8, u = 1 - t; path.push([u * u * s0[0] + 2 * u * t * b[0] + t * t * e[0], u * u * s0[1] + 2 * u * t * b[1] + t * t * e[1]]); }
+  }
+  path.push(pts[pts.length - 1]);
+  const dist = [0];
+  for (let i = 1; i < path.length; i++) dist.push(dist[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
+  const pivotS = dist[1], rev = sign !== c.front, L = Math.hypot(path[2][0] - path[1][0], path[2][1] - path[1][1]) || 1;
+  const n = path.length - 1, Le = Math.hypot(path[n][0] - path[n - 1][0], path[n][1] - path[n - 1][1]) || 1;
+  return { path, dist, total: dist[n], pivotS, lotEnd: pivotS, revUntil: rev ? pivotS : 0, pivot: pts[1], rho,
+    after: [(path[2][0] - path[1][0]) / L, (path[2][1] - path[1][1]) / L], end: [(path[n][0] - path[n - 1][0]) / Le, (path[n][1] - path[n - 1][1]) / Le] };
+}
+function along(route, s) {
+  const { path, dist } = route;
+  let i = 1; while (i < path.length - 1 && dist[i] < s) i++;
+  const a = path[i - 1], b = path[i], seg = dist[i] - dist[i - 1] || 1, t = clamp((s - dist[i - 1]) / seg, 0, 1);
+  return { x: lerp(a[0], b[0], t), z: lerp(a[1], b[1], t), dx: (b[0] - a[0]) / seg, dz: (b[1] - a[1]) / seg };
+}
+// Where a car is and which way it faces at s along its route. Up to the turning point it slides along its lane,
+// facing the way it was parked. On the road, a point near its front and one near its back both stay on the road (like
+// a real car's wheels), so on a bend the car cuts a little inside rather than swinging its back end out.
+function pathPoint(r, s) {
+  if (s <= r.pivotS) return [r.pivot[0] - r.after[0] * (r.pivotS - s), r.pivot[1] - r.after[1] * (r.pivotS - s)];
+  if (s >= r.total) { const q = r.path[r.path.length - 1]; return [q[0] + r.end[0] * (s - r.total), q[1] + r.end[1] * (s - r.total)]; }
+  const p = along(r, s); return [p.x, p.z];
+}
+function placeAt(c, s) {
+  const r = c.route;
+  if (s <= r.pivotS + 1e-6) { const p = along(r, s); return { x: p.x, z: p.z, yaw: c.yaw0 }; }
+  const k = c.half * 0.7, f = pathPoint(r, s + k), b = pathPoint(r, s - k);
+  return { x: (f[0] + b[0]) / 2, z: (f[1] + b[1]) / 2, yaw: yawOf(f[0] - b[0], f[1] - b[1]) };
+}
+const yawFor = (c, s) => placeAt(c, s).yaw;
+
+// a car keeps the bollards on its way down until it's out of the car park (or back in its space)
+const reserve = (c, cells) => { c.cells = cells; for (const k of cells) board.reserved.set(k, (board.reserved.get(k) || 0) + 1); };
+const release = (c) => { for (const k of c.cells || []) board.reserved.set(k, board.reserved.get(k) - 1); c.cells = null; };
+
+function leave(c, sign) {
+  for (const [x, y] of cellsOf(c)) board.grid[y * board.w + x] = 0;
+  reserve(c, laneCells(board, c, sign));
+  c.state = 'leave'; c.route = exitPath(c, sign); c.s = 0; c.v = 0; c.order = ++order; c.beepIn = 0; c.puffIn = 0;
+  c.yaw0 = c.yaw; c.pivotDone = false; c.still = 0;
+  const { pivot, rho } = c.route;
+  zones.push({ kind: 'turn', car: c, rect: box2(pivot[0], pivot[1], 0, rho + 0.02, rho + 0.02), owner: null, entered: false });
+  c.face.lids.scale.y = 1;
+  c.beam.visible = !!theme.night;
+  sfx.vroom(c.big);
+  if (c.kind === 'police' || c.kind === 'fire' || c.kind === 'ambulance') sfx.siren(c.kind);
+  if (c.kind === 'icecream') sfx.jingle();
+  exhaust(c, 4);
+  buzz(15);
+}
+
+function bump(c, sign, l) {
+  bumps++;
+  // roll on until the outlines are just short of touching: cars sit a little inside their squares, obstacles are
+  // narrower than a square, a pop-up bollard is a thin post in the middle of one, and a hedge pokes in a little
+  const [x, y] = c.axis === 'h' ? [l.at, c.y] : [c.x, l.at];
+  const other = typeof l.hit === 'number' && l.hit > 0 && cars.find((k) => k.id === l.hit);
+  const gap = other ? endGap(other) : l.hit === 'pop' ? 0.37 : l.hit === 'fence' ? -0.03
+    : { cone: 0.27, tree: 0.12, bollard: 0.38 }[props.find((q) => q.x === x && q.y === y)?.kind] ?? 0.12;
+  const touch = endGap(c) + gap - 0.015;
+  c.state = 'bump'; c.bump = { sign, to: l.dist + touch, v: 0, t: 0, back: false, hit: l.hit, at: l.at, pop: l.pop };
+  reserve(c, laneCells(board, c, sign).slice(0, Math.ceil(l.dist)));
+  if (sign !== c.front) sfx.beep();
+}
+function impact(c) {
+  const { hit, sign, at, pop } = c.bump;
+  sfx.thud(); buzz(40);
+  c.shake = 1;
+  dust(c.pos.clone().addScaledVector(c.ax, sign * (c.len / 2 - 0.05)), 5);
+  if (typeof hit === 'number' && hit > 0) {
+    const o = cars.find((k) => k.id === hit);
+    if (o) {
+      o.shake = 1;
+      if (o.sleepy) { wake(o); return; }   // bumping a sleepy car wakes it up
+      o.cross = 1.6; sfx.honk(o.big, true); bubble(o, '💢');
+    }
+  } else if (hit === -1) {
+    const [x, y] = c.axis === 'h' ? [at, c.y] : [c.x, at];
+    const p = props.find((q) => q.x === x && q.y === y);
+    if (p) p.wob = 1;
+    sfx.boing();
+  } else if (hit === 'pop') {
+    if (pop) pop.wob = 1;
+    sfx.clang();
+    setTimeout(() => help('say-bollard'), 500);
+  } else {
+    const key = c.axis === 'h' ? (sign > 0 ? 'r' : 'l') + c.y : (sign > 0 ? 'b' : 't') + c.x;
+    if (hedges[key]) hedges[key].userData.wob = 1;
+    sfx.boing();
+  }
+}
+
+/* ======== space: no car ever drives into another ======== */
+// Every car has an outline, a rectangle a hair bigger than its body. A car only ever moves to where its outline
+// overlaps no other car's, so cars can't drive through each other. That alone could leave two cars each waiting for
+// the other, so a few places are booked first: a car pulling out books a square of road big enough to turn round in
+// (before it leaves its space, so it never waits halfway out), the corner where the two streams of traffic meet takes
+// one car at a time, and the ducks book their crossing. A booking is only given when nobody is in it.
+const LONG_PAD = 0.06, WIDE = 0.44;
+const box2 = (x, z, yaw, hl, hw) => ({ x, z, ux: Math.cos(yaw), uz: -Math.sin(yaw), hl, hw });
+const outlineAt = (c, x, z, yaw) => box2(x, z, yaw, c.half + LONG_PAD, WIDE);
+const endGap = (c) => (c.len - 2 * (c.half + LONG_PAD)) / 2;   // between a parked car's outline and the end of its squares
+function overlaps(a, b) {   // two turned rectangles (separating axis test)
+  const dx = b.x - a.x, dz = b.z - a.z;
+  for (const [ax, az] of [[a.ux, a.uz], [-a.uz, a.ux], [b.ux, b.uz], [-b.uz, b.ux]]) {
+    const ra = a.hl * Math.abs(a.ux * ax + a.uz * az) + a.hw * Math.abs(-a.uz * ax + a.ux * az);
+    const rb = b.hl * Math.abs(b.ux * ax + b.uz * az) + b.hw * Math.abs(-b.uz * ax + b.ux * az);
+    if (Math.abs(dx * ax + dz * az) >= ra + rb) return false;
+  }
+  return true;
+}
+let zones = [], outlines = new Map();
+// can zone z be booked by who (a car, or 'ducks')? Only when no one else is in it or has booked a piece of it.
+function canBook(who, z) {
+  for (const [o, f] of outlines) if (o !== who && overlaps(z.rect, f)) return false;
+  for (const y of zones) if (y !== z && y.owner && y.owner !== who && overlaps(z.rect, y.rect)) return false;
+  return true;
+}
+// is outline f free for car c? With book, it also books what it needs to get there.
+function freeFor(c, f, book) {
+  for (const [o, of] of outlines) if (o !== c && overlaps(f, of)) return false;
+  const need = [], holds = zones.some((z) => z.owner === c), now = outlines.get(c);
+  for (const z of zones) {
+    if (z.owner === c || !overlaps(f, z.rect)) continue;
+    if (z.owner) return false;                                   // someone else's booking
+    if (z.kind === 'junction' || z.car === c) need.push(z);      // (another car's unbooked turning square is just road,
+    // unless that car has been waiting to pull out: then no new car from the road drives in, so it empties and can
+    // be booked; a car already in it, or holding a booking of its own, still drives on, so nobody waits for ever)
+    else if (z.waiting && c.pivotDone && !holds && !(now && overlaps(now, z.rect))) return false;   // (road traffic only)
+  }
+  for (const z of need) if (!canBook(c, z)) return false;
+  if (book) for (const z of need) { z.owner = c; z.entered = false; }
+  return true;
+}
+// move car c up to ds along its route, as far as it can go without touching anything; returns how far it went
+function advance(c, ds) {
+  const at = (s) => { const p = placeAt(c, s); return outlineAt(c, p.x, p.z, p.yaw); };
+  let go = ds;
+  if (!freeFor(c, at(c.s + go), false)) {
+    let lo = 0, hi = go;
+    for (let i = 0; i < 6; i++) { const m = (lo + hi) / 2; if (freeFor(c, at(c.s + m), false)) lo = m; else hi = m; }
+    go = lo;
+  }
+  if (go <= 1e-5) return 0;
+  const f = at(c.s + go);
+  if (!freeFor(c, f, true)) return 0;
+  c.s += go;
+  const p = placeAt(c, c.s); c.pos.set(p.x, 0, p.z); c.yaw = p.yaw; outlines.set(c, f);
+  return go;
+}
+// bookings end once the car that holds one has driven out of it; a car that's gone gives everything back
+function settleZones(c) {
+  const f = outlines.get(c);
+  for (const z of zones) {
+    if (z.owner !== c) continue;
+    if (c.state === 'gone') { z.owner = null; continue; }
+    if (overlaps(f, z.rect)) z.entered = true;
+    else if (z.entered) { z.owner = null; z.entered = false; if (z.car === c) z.done = true; }
+  }
+  if (c.state === 'gone') zones = zones.filter((z) => z.car !== c);
+  else zones = zones.filter((z) => !z.done);
+}
+// the last resort, for a jam the rules didn't foresee: when no car has moved for STUCK_POOF seconds, the one that has
+// waited longest vanishes in a puff of smoke (cars never drive through each other, even then)
+function poof(c) {
+  for (let i = 0; i < 10; i++) spawn(SOFT, c.pos.clone().setY(0.4), new THREE.Vector3((Math.random() - 0.5) * 1.6, 0.6 + Math.random() * 0.6, (Math.random() - 0.5) * 1.6), 0.8, 0.5, '#e9edf2', 1.5, 0.9);
+  sfx.pop();
+  window.tbxEvent?.('jam', { level, kind: c.kind });
+  if (c.cells) release(c);
+  c.outOfLot = true; c.passed = true; c.state = 'gone'; c.root.visible = false;
+  settleZones(c); updateHud(); checkWin();
+}
+
+// Ducks: now and then the family walks from the pond, over the zebra crossing past the barrier, to a spot on the
+// grass, and later back. At the kerb they book the crossing (only when no car is on it or coming fast) and wait if
+// they can't; once they've booked it, every car waits for them until the last duckling is across.
+function stepDucks(dt, t) {
+  if (!ducks) return;
+  const D = ducks, cx = W2() + R, zz = zebraZ();
+  if (!D.walking) {
+    D.nextIn -= dt;
+    if (D.nextIn <= 0 && playing && !won) { D.walking = true; D.t = 0; D.route = D.side === 'pond' ? D.toGrass : D.toPond; sfx.quack(); }
+  }
+  if (D.walking) {
+    const lead = D.t * DUCK_SPEED, last = lead - (D.list.length - 1) * 0.34;
+    if (!D.zone.owner && lead >= D.route.in && last < D.route.out) {
+      const busy = cars.some((c) => c.state === 'leave' && Math.abs(c.pos.x - cx) < 1.2 && c.pos.z < zz + 1 && c.pos.z > zz - 1.4 - (c.v || 0) * 0.45);
+      if (!busy && canBook('ducks', D.zone)) {
+        D.zone.owner = 'ducks';
+        if (cars.some((c) => c.state === 'leave' && !c.passed)) help('say-ducks');   // (only when there's a car to wait)
+      }
+      else D.t = D.route.in / DUCK_SPEED;   // wait at the kerb
+    }
+    if (D.zone.owner === 'ducks' && last > D.route.out) D.zone.owner = null;
+  }
+  let home = 0;
+  for (const d of D.list) {
+    if (D.walking) {
+      const s = clamp(D.t * DUCK_SPEED - d.i * 0.34, 0, D.route.total), p = along(D.route, s);
+      d.pos.set(p.x - p.dz * (d.i % 2 ? 0.07 : -0.07), 0, p.z + p.dx * (d.i % 2 ? 0.07 : -0.07));
+      d.yaw = yawOf(p.dx, p.dz);
+      if (s >= D.route.total) home++;
+      const waiting = !D.zone.owner && D.t * DUCK_SPEED <= D.route.in + 1e-6 && D.t > 0;
+      d.mesh.rotation.z = Math.sin(t * 14 + d.i) * 0.14 * (s > 0 && s < D.route.total && !waiting ? 1 : 0);
+    } else {
+      d.mesh.rotation.z = 0;
+      d.pos.y = D.side === 'pond' ? 0.02 + Math.sin(t * 2 + d.i) * 0.015 : 0;
+    }
+    if (d.hop > 0) d.hop = Math.max(0, d.hop - dt * 3);
+    d.mesh.position.set(d.pos.x, d.pos.y + Math.sin(d.hop * Math.PI) * 0.18, d.pos.z);
+    d.mesh.rotation.y = d.yaw;
+  }
+  if (D.walking) D.t += dt;
+  if (D.walking && home === D.list.length) {
+    D.walking = false; D.zone.owner = null; D.side = D.side === 'pond' ? 'grass' : 'pond';
+    D.nextIn = DUCK_EVERY[0] + Math.random() * (DUCK_EVERY[1] - DUCK_EVERY[0]);
+    const [rx, rz] = D.side === 'pond' ? [D.pond.x, D.pond.z] : D.rest;
+    D.list.forEach((d, i) => d.pos.set(rx + (i - 1.5) * 0.35, D.side === 'pond' ? 0.02 : 0, rz + (i % 2 ? 0.2 : -0.15)));
+  }
+}
+
+function stepPops(dt, t) {
+  for (const p of pops) {
+    p.t -= dt;
+    if (p.state === 'down' && p.t <= 0) { p.state = 'warn'; p.t = POP_WARN; }
+    else if (p.state === 'warn' && p.t <= 0 && !(board.reserved.get(p.k) > 0)) { p.state = 'up'; p.up = true; p.t = POP_UP; sfx.clunk(); }
+    else if (p.state === 'up' && p.t <= 0) { p.state = 'down'; p.up = false; p.t = POP_DOWN; sfx.clunk(); }
+    p.h += clamp((p.up ? 1 : 0) - p.h, -dt * 5, dt * 5);
+    p.post.position.y = (p.h - 1) * 0.74;
+    p.light.material.emissiveIntensity = p.state === 'warn' ? (Math.floor(t * 8) % 2 ? 2.5 : 0.2) : p.up ? 1.5 : 0;
+    if (p.wob > 0) { p.wob = Math.max(0, p.wob - dt * 2); p.post.rotation.z = Math.sin(t * 30) * 0.12 * p.wob; }
+  }
+}
+
+function step(dt, t) {
+  if (intro < 1) { intro = Math.min(1, intro + dt / 1.3); placeCamera(); }
+  outlines = new Map(cars.filter((c) => c.state !== 'gone').map((c) => [c, outlineAt(c, c.pos.x, c.pos.z, c.yaw)]));
+  // the cars nearest the exit move first, so a queue moves up together
+  const queue = cars.filter((c) => c.state === 'leave').sort((a, b) => (a.route.total - a.s) - (b.route.total - b.s))
+    .concat(cars.filter((c) => c.state !== 'leave'));
+  for (const c of queue) {
+    let acc = 0, turn = 0;
+    if (c.state === 'leave') {
+      const r = c.route, rev = c.s < r.revUntil, s0 = c.s, y0 = c.yaw, v0 = c.v;
+      // waiting at the edge of the car park for its turning square: ask road traffic to leave it clear
+      const square = zones.find((z) => z.car === c);
+      if (square && !square.owner && c.s < r.pivotS) {
+        const p = placeAt(c, Math.min(c.s + 0.05, r.pivotS));   // (only when the square is all that holds it up, not a car ahead in its lane)
+        square.waiting = c.still > 1 && overlaps(outlineAt(c, p.x, p.z, p.yaw), square.rect);
+      }
+      if (c.s >= r.pivotS - 1e-6 && !c.pivotDone) {
+        // at the turning point: stop and turn on the spot to face along the road
+        c.v = 0;
+        const err = wrapAngle(yawOf(r.after[0], r.after[1]) - c.yaw);
+        if (Math.abs(err) <= 1e-3) c.pivotDone = true;
+        else {
+          const y2 = c.yaw + clamp(err, -dt * PIVOT_RATE, dt * PIVOT_RATE), f = outlineAt(c, c.pos.x, c.pos.z, y2);
+          if (freeFor(c, f, true)) { c.yaw = y2; outlines.set(c, f); }
+        }
+      } else {
+        let top = c.s < r.pivotS ? DRIVE_SPEED : ROAD_SPEED;
+        if (rev) top *= 0.7;
+        if (c.s < r.pivotS) top = Math.min(top, Math.sqrt(BRAKE * (r.pivotS - c.s)) + 0.4);   // slow down for the turning point
+        else if (Math.abs(wrapAngle(yawFor(c, c.s + 1.0) - c.yaw)) > 0.3) top = Math.min(top, 2.6);   // and for bends
+        // look as far ahead as it takes to stop: brake if that spot is taken
+        const look = Math.min(c.s + c.v * c.v / (2 * BRAKE) + 0.15, c.s < r.pivotS ? r.pivotS : r.total + 2), p = placeAt(c, look);
+        const clear = freeFor(c, outlineAt(c, p.x, p.z, p.yaw), false);
+        c.v = clear ? Math.min(top, c.v + dt * ACCEL) : Math.max(0.5, c.v - dt * BRAKE);   // (creep up to whatever is in the way)
+        let ds = c.v * dt;
+        if (c.s < r.pivotS) ds = Math.min(ds, r.pivotS - c.s);
+        const went = ds > 0 ? advance(c, ds) : 0;
+        if (went < ds - 1e-6) c.v = went / dt;
+      }
+      turn = wrapAngle(c.yaw - y0);
+      acc = (c.v - v0) / Math.max(dt, 1e-3) * (rev ? -1 : 1);
+      c.still = c.s - s0 > 1e-4 || Math.abs(turn) > 1e-4 ? 0 : c.still + dt;
+      if (rev && c.v > 0.1 && (c.beepIn -= dt) <= 0) { sfx.beep(); c.beepIn = 0.38; }
+      if (c.v > 0.2 && c.v < 3.5 && (c.puffIn -= dt) <= 0) { exhaust(c, 1); c.puffIn = 0.16; }
+      if (c.cells && c.s >= r.lotEnd) release(c);
+      if (!c.outOfLot && c.s >= r.lotEnd) { c.outOfLot = true; sfx.pop(); updateHud(); const el = $('#left'); el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); checkWin(); }
+      for (const [i, f] of c.flash.entries()) f.visible = Math.floor(t * 6 + i) % 2 === 0;
+      if (!c.passed && c.pos.z > gate.z + 2.5) { c.passed = true; stars(c.pos); sfx.sparkle(); checkWin(); }
+      if (c.s >= r.total) { c.state = 'gone'; c.root.visible = false; outlines.delete(c); }
+      settleZones(c);
+    } else if (c.state === 'bump') {
+      const b = c.bump;
+      const at = (off) => outlineAt(c, c.home.x + c.ax.x * b.sign * off, c.home.z + c.ax.z * b.sign * off, c.yaw);
+      if (!b.back) {
+        const v0 = b.v;
+        b.v = Math.min(BUMP_SPEED, b.v + dt * 14);
+        acc = (b.v - v0) / Math.max(dt, 1e-3) * (b.sign === c.front ? 1 : -1);
+        const off2 = Math.min(b.to, c.off + b.v * dt);
+        if (freeFor(c, at(off2), false)) {
+          c.off = off2;
+          if (c.off >= b.to) { b.back = true; b.from = c.off; impact(c); c.pitch = -0.08 * (b.sign === c.front ? 1 : -1); }
+        } else { b.back = true; b.from = c.off; b.t = 0.12; }   // a moving car is crossing its way: roll back without a bump
+      } else {
+        b.t += dt;
+        const k = clamp((b.t - 0.12) / (0.25 + b.from * 0.12), 0, 1), off2 = b.from * (1 - ease(k));
+        if (freeFor(c, at(off2), false)) { c.off = off2; if (k >= 1) { c.off = 0; c.state = 'parked'; release(c); } }
+        else b.t -= dt;   // wait for it to pass
+      }
+      c.pos.copy(c.home).addScaledVector(c.ax, b.sign * c.off);
+      outlines.set(c, at(c.off));
+    }
+    // looks: lean back when speeding up and forward when stopping, lean out on bends, wobble when bumped, hop when woken
+    c.root.position.copy(c.pos);
+    c.root.rotation.y = c.yaw;
+    c.pitch = lerp(c.pitch, clamp(acc * 0.006, -0.07, 0.07), Math.min(1, dt * 10));
+    c.roll = lerp(c.roll, clamp(-turn / Math.max(dt, 1e-3) * (c.v || 0) * 0.012, -0.08, 0.08), Math.min(1, dt * 8));
+    if (c.shake > 0) c.shake = Math.max(0, c.shake - dt * 2.5);
+    if (c.hop > 0) c.hop = Math.max(0, c.hop - dt * 2.2);
+    c.body.rotation.z = c.pitch;
+    c.body.rotation.x = c.roll + Math.sin(t * 40) * 0.06 * c.shake;
+    c.body.position.y = Math.abs(Math.sin(t * 30)) * 0.05 * c.shake + Math.sin(c.hop * Math.PI) * 0.35;
+    if (c.spinner) c.spinner.rotation.y += dt * (c.state === 'leave' ? 4 : 1.2);
+    if (c.cross > 0) c.cross -= dt;
+    for (const br of c.face.brows) br.visible = c.cross > 0;
+    if (c.sleepy) {
+      // asleep: eyes shut, a slow breath, and Zzz floating up
+      c.body.scale.y = 1 + Math.sin(t * 2 + c.id) * 0.02;
+      if ((c.zIn -= dt) <= 0) { c.zIn = 0.8; spawn(ZED, c.pos.clone().setY(c.big ? 1.3 : 1.0), new THREE.Vector3(0.22, 0.55, -0.12), 1.8, 0.42, '#dff1ff', 0.7); }
+    } else {
+      c.body.scale.y = 1;
+      if ((c.blink -= dt) <= 0) { c.blink = 2 + Math.random() * 4; c.blinkT = 0.13; }
+      if (c.blinkT > 0) { c.blinkT -= dt; c.face.lids.scale.y = c.blinkT > 0 ? 0.12 : 1; }
+    }
+  }
+  const leaving = cars.filter((c) => c.state === 'leave');
+  if (leaving.length && leaving.every((c) => c.still > STUCK_POOF)) { const c = leaving.reduce((a, b) => (b.still > a.still ? b : a)); outlines.delete(c); poof(c); }
+  for (const p of props) if (p.wob > 0) { p.wob = Math.max(0, p.wob - dt * 2); p.mesh.rotation.z = Math.sin(t * 25) * 0.25 * p.wob; }
+  for (const k in hedges) { const m = hedges[k]; if (m.userData.wob > 0) { m.userData.wob = Math.max(0, m.userData.wob - dt * 2.5); m.scale.y = 1 + Math.sin(t * 30) * 0.2 * m.userData.wob; } }
+  stepPops(dt, t);
+  stepDucks(dt, t);
+  stepFx(dt);
+  if (fall) {
+    const a = fall.pts.geometry.attributes.position, arr = a.array, half = fall.span / 2, snow = fall.kind === 'snow';
+    for (let i = 0; i < arr.length; i += 3) {
+      arr[i + 1] -= dt * (snow ? 0.7 : 0.9);
+      arr[i] += Math.sin(t * (snow ? 1.3 : 2) + i) * dt * (snow ? 0.25 : 0.6);
+      if (arr[i + 1] < 0) { arr[i + 1] = 8; arr[i] = (Math.random() - 0.5) * fall.span; arr[i + 2] = (Math.random() - 0.5) * fall.span; }
+      if (arr[i] > half) arr[i] -= fall.span; else if (arr[i] < -half) arr[i] += fall.span;
+    }
+    a.needsUpdate = true;
+  }
+  // the barrier lifts for any car about to reach it
+  const near = cars.some((c) => c.state === 'leave' && c.pos.z > gate.z - 2.6 && c.pos.z < gate.z + 1.2 && Math.abs(c.pos.x - gate.x) < 0.8);
+  if (near && !gate.open) sfx.gate();
+  gate.open = near;
+  gate.angle += clamp((near ? 1.35 : 0) - gate.angle, -dt * 5, dt * 5);
+  gate.pivot.rotation.z = gate.angle;
+  const moving = cars.some((c) => c.state === 'leave' || c.state === 'bump' || c.shake > 0 || c.hop > 0 || Math.abs(c.pitch) > 1e-3 || Math.abs(c.roll) > 1e-3)
+    || pops.some((p) => (p.h > 0 && p.h < 1) || p.wob > 0) || props.some((p) => p.wob > 0) || Object.values(hedges).some((m) => m.userData.wob > 0)
+    || (ducks && (ducks.walking || ducks.list.some((d) => d.hop > 0))) || Math.abs(gate.angle - (near ? 1.35 : 0)) > 1e-3;
+  if (moving || wasMoving || shadowDirty) renderer.shadowMap.needsUpdate = true;   // (one more after it stops, for the last position)
+  wasMoving = moving; shadowDirty = false;
+  // a hand points at a car that can go when nothing has happened for a while
+  if (playing && !won) {
+    if (!cars.some((c) => c.state === 'leave' && !c.outOfLot)) hintIn -= dt;
+    if (hintIn <= 0 && !hintCar) showHint();
+    if (hintCar && hintCar.state !== 'parked') hideHint();
+  }
+  if (hintCar) { const p = toScreen(hintCar.pos.clone().setY(0.5)); hand.style.transform = `translate(${p.x - 27}px, ${p.y - 4}px)`; }
+  for (const el of document.querySelectorAll('.bubble')) el._place?.();
+}
+
+// The cheer comes the moment the last car is out of the car park (not seconds later, when it reaches the barrier);
+// the ▶ card comes once that car has driven past the barrier.
+let cardDue = false;
+function checkWin() {
+  if (!won && cars.every((c) => c.outOfLot)) {
+    won = true; hideHint();
+    const secs = Math.round((performance.now() - startedAt) / 1000);
+    window.tbxEvent?.('level-end', { level, won: true, taps, bumps, secs });
+    store.set('level', level + 1);
+    sfx.fanfare();
+    setTimeout(() => sfx.say(['say-out-1', 'say-out-2', 'say-out-3'][level % 3]), 900);
+    confetti();
+  }
+  if (won && !cardDue && cars.every((c) => c.passed)) {
+    cardDue = true;
+    const n = level;
+    setTimeout(() => { if (level !== n) return; $('#dlvl').textContent = level; $('#done').hidden = false; playing = false; }, 500);
+  }
+}
+function confetti() {
+  if (REDUCED) return;
+  for (let i = 0; i < 46; i++) {
+    const el = document.createElement('div'); el.className = 'confetti';
+    el.style.left = Math.random() * 100 + 'vw'; el.style.background = COLORS[i % COLORS.length];
+    el.style.animationDuration = 1.6 + Math.random() * 1.6 + 's'; el.style.animationDelay = Math.random() * 0.5 + 's';
+    document.body.appendChild(el); setTimeout(() => el.remove(), 4000);
+  }
+}
+
+let last = performance.now(), simTime = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  simTime += dt;
+  step(dt, simTime);
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+/* ======== start, next level, sound button ======== */
+level = Math.max(1, parseInt(params.get('level'), 10) || store.get('level', 1));
+buildLevel(level);
+$('#tlvl').textContent = level;
+$('#again').hidden = level <= 1;
+requestAnimationFrame(frame);
+
+// music for the look of the car park, and the sleepy-car line once a car park with one starts
+function startPlay() {
+  playing = true;
+  sfx.music(theme.night ? 'music-night' : 'music-day');
+  const n = level;
+  if (cars.some((c) => c.sleepy)) setTimeout(() => { if (level === n && playing) help('say-sleepy'); }, 1500);
+}
+$('#play').addEventListener('click', () => { sfx.init(); sfx.tap(); $('#title').hidden = true; startPlay(); });
+$('#again').addEventListener('click', () => { store.set('level', 1); buildLevel(1); $('#tlvl').textContent = 1; $('#again').hidden = true; });
+$('#next').addEventListener('click', () => { sfx.init(); sfx.tap(); $('#done').hidden = true; buildLevel(level + 1); startPlay(); });
+const muteBtn = $('#mute');
+const drawMute = () => { muteBtn.textContent = sfx.muted ? '🔇' : '🔈'; };
+drawMute();
+muteBtn.addEventListener('click', () => { sfx.init(); sfx.toggle(); drawMute(); });
+document.addEventListener('visibilitychange', () => { last = performance.now(); });
+
+// for testing from the console: carpark.solve() taps the cars that can go, one a second
+window.carpark = {
+  get board() { return board; }, get cars() { return cars; }, get level() { return level; }, get ducks() { return ducks; }, get pops() { return pops; }, get zones() { return zones; }, get audio() { return { loaded: sfx.loaded, running: sfx.running, muted: sfx.muted, music: sfx.playingMusic }; },
+  // what's in the way of car id's next move (for finding jams)
+  why(id) {
+    const c = cars.find((k) => k.id === id); if (!c || c.state !== 'leave') return null;
+    const r = c.route, pivoting = c.s >= r.pivotS - 1e-6 && !c.pivotDone;
+    let f;
+    if (pivoting) { const err = wrapAngle(yawOf(r.after[0], r.after[1]) - c.yaw); f = outlineAt(c, c.pos.x, c.pos.z, c.yaw + clamp(err, -0.1, 0.1)); }
+    else { const p = placeAt(c, c.s + 0.05); f = outlineAt(c, p.x, p.z, p.yaw); }
+    const out = { pivoting, v: c.v, freeNext: freeFor(c, f, false), cars: [], zones: [] };
+    for (const [o, of] of outlines) if (o !== c && overlaps(f, of)) out.cars.push(o.id + o.state);
+    for (const z of zones) if (z.owner !== c && overlaps(f, z.rect)) {
+      const who = [...outlines].filter(([o, of]) => o !== c && overlaps(z.rect, of)).map(([o]) => o.id);
+      const claims = zones.filter((y) => y !== z && y.owner && y.owner !== c && overlaps(z.rect, y.rect)).map((y) => y.kind + (y.car ? '#' + y.car.id : '') + '@' + (y.owner === 'ducks' ? 'ducks' : y.owner.id));
+      out.zones.push(`${z.kind}${z.car ? '#' + z.car.id : ''}${z.waiting ? ' WAITING' : ''} owner=${z.owner === 'ducks' ? 'ducks' : z.owner ? z.owner.id : '-'} carsIn=[${who}] overlappingBookings=[${claims}]`);
+    }
+    return out;
+  },
+  go(n) { $('#title').hidden = true; $('#done').hidden = true; buildLevel(n); playing = true; },
+  solve(ms = 900) {
+    const t = setInterval(() => {
+      const c = cars.find((k) => k.state === 'parked' && free(board, k));
+      if (!c) { if (cars.every((k) => k.state !== 'parked')) clearInterval(t); return; }
+      tapCar(c, lane(board, c, c.front).ok ? c.front : -c.front, true);
+    }, ms);
+  },
+  depth: () => depthOf(board),
+  get draws() { return renderer.info.render; },
+  get three() { return { scene, hemi, sun, renderer, camera, mats }; },
+  // run the game clock by hand (a hidden browser tab barely draws frames)
+  tick(seconds, draw = true) { for (let i = 0; i < seconds * 30; i++) { simTime += 1 / 30; step(1 / 30, simTime); } if (draw) renderer.render(scene, camera); },
+  // tap a car the way a finger would: sign +1 / -1 is the half that's tapped, along the car's axis
+  screenOf(id) { const c = cars.find((k) => k.id === id); return c && toScreen(c.pos.clone().setY(0.5)); },
+  tap(id, sign) { const c = cars.find((k) => k.id === id); if (c && c.state === 'parked') tapCar(c, sign ?? c.front, false); },
+};
+</script>
+<script>
+// Offline support: sw.js caches this page. Once the page has loaded, send it every file the page used (fonts,
+// three.js) so those work offline too. Fails quietly where unsupported, e.g. on file://.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then((reg) => {
+    const send = () => reg.active && reg.active.postMessage({ cache: [location.href, ...performance.getEntriesByType('resource').map((r) => r.name)] });
+    send(); setTimeout(send, 5000); setTimeout(send, 20000);
+  }).catch(() => {});
+}
+</script>
+</body>
+</html>
